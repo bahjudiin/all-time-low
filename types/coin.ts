@@ -51,6 +51,8 @@ export interface Filters {
   athDateRange: [string, string] | null;
 }
 
+export type TabId = "glance" | "all-time-high" | "gainers" | "losers" | "near-ath" | "near-atl";
+
 export interface ScreenerState {
   search: string;
   sort: SortState;
@@ -59,4 +61,5 @@ export interface ScreenerState {
   currency: string;
   rowsPerPage: number;
   page: number;
+  activeTab: TabId;
 }

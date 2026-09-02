@@ -2,11 +2,13 @@
 
 import useSWR from "swr";
 import { useMemo } from "react";
-import type { CoinMarket, CoinWithDerived } from "@/types/coin";
+import type { CoinMarket, CoinWithDerived, TabId } from "@/types/coin";
 import { computeDerived } from "@/lib/coingecko";
-import { useScreenerStore } from "@/lib/store";
+import { useScreenerStore, setActiveTab } from "@/lib/store";
 import { DataTable } from "./DataTable";
 import { Toolbar } from "./Toolbar";
+import { MarketGlance } from "./MarketGlance";
+import { isStable } from "@/lib/filters";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -38,10 +40,10 @@ interface ScreenerClientProps {
 }
 
 export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
-  const { currency, layout, search, filters, page, rowsPerPage } =
+  const { currency, layout, search, filters, page, rowsPerPage, activeTab } =
     useScreenerStore();
 
-  const { data: rawCoins, error, isLoading } = useSWR<CoinMarket[]>(
+  const { data: rawCoins, isLoading } = useSWR<CoinMarket[]>(
     `/api/coins?currency=${currency}`,
     fetcher,
     {
@@ -54,11 +56,41 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
 
   const coins: CoinWithDerived[] = useMemo(() => {
     if (!rawCoins) return [];
-    return rawCoins.map((coin) => ({ ...coin, ...computeDerived(coin) }));
+    return rawCoins
+      .map((coin) => ({ ...coin, ...computeDerived(coin) }))
+      .filter((c) => !isStable(c));
   }, [rawCoins]);
 
+  const tabCoins = useMemo(() => {
+    const movers = [...coins].sort(
+      (a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h
+    );
+    const losers = [...coins].sort(
+      (a, b) => a.price_change_percentage_24h - b.price_change_percentage_24h
+    );
+    switch (activeTab) {
+      case "all-time-high":
+        return [...coins].sort((a, b) => b.market_cap - a.market_cap);
+      case "gainers":
+        return movers;
+      case "losers":
+        return losers;
+      case "near-ath":
+        return coins
+          .filter((c) => c.ath_change_percentage >= -15 && c.ath_change_percentage < 0)
+          .sort((a, b) => b.market_cap - a.market_cap);
+      case "near-atl":
+        return coins
+          .filter((c) => c.atl_change_percentage <= 15 && c.atl_change_percentage > 0)
+          .sort((a, b) => b.market_cap - a.market_cap);
+      case "glance":
+      default:
+        return [...coins].sort((a, b) => b.market_cap - a.market_cap);
+    }
+  }, [coins, activeTab]);
+
   const filteredCoins = useMemo(() => {
-    let result = coins;
+    let result = tabCoins;
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -94,7 +126,7 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
       });
     }
     return result;
-  }, [coins, search, filters]);
+  }, [tabCoins, search, filters]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -106,84 +138,110 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
     return count;
   }, [filters]);
 
+  const TABS: { id: TabId; label: string }[] = [
+    { id: "glance", label: "Market Glance" },
+    { id: "all-time-high", label: "All-Time High" },
+    { id: "near-ath", label: "Near ATH" },
+    { id: "near-atl", label: "Near ATL" },
+    { id: "gainers", label: "Gainers (24h)" },
+    { id: "losers", label: "Losers (24h)" },
+  ];
+
+  const isGlance = activeTab === "glance";
+
   return (
     <>
       {/* Sub-nav tabs */}
-      <div className="flex items-center gap-1 px-6 py-2 border-b border-zinc-200 dark:border-zinc-800">
-        <button className="px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white">
-          All-Time High
-        </button>
-        <button className="px-3 py-1.5 text-sm font-medium rounded-md text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
-          Gainers (24h)
-        </button>
-        <button className="px-3 py-1.5 text-sm font-medium rounded-md text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
-          Losers (24h)
-        </button>
-        <button className="px-3 py-1.5 text-sm font-medium rounded-md text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
-          Categories
-        </button>
+      <div className="flex items-center gap-1 px-6 py-2 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${
+              activeTab === tab.id
+                ? "bg-blue-600 text-white"
+                : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Toolbar */}
-      <Toolbar data={filteredCoins} activeFilterCount={activeFilterCount} />
+      {isGlance ? (
+        <MarketGlance coins={coins} />
+      ) : (
+        <>
+          {/* Toolbar */}
+          <Toolbar data={filteredCoins} activeFilterCount={activeFilterCount} />
 
-      {/* Main content */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {isLoading && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-zinc-500">Loading coin data...</p>
-            </div>
-          </div>
-        )}
-
-        {!isLoading && filteredCoins.length === 0 && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-zinc-500 mb-2">No coins match your filters</p>
-              <button
-                onClick={() =>
-                  useScreenerStore.setState({
-                    search: "",
-                    filters: {
-                      marketCap: null,
-                      volume: null,
-                      pctFromATH: null,
-                      pctFromATL: null,
-                      athDateRange: null,
-                    },
-                  })
-                }
-                className="text-sm text-blue-500 hover:text-blue-400"
-              >
-                Clear all filters
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!isLoading && filteredCoins.length > 0 && (
-          <>
-            {layout === "table" ? (
-              <DataTable data={filteredCoins} />
-            ) : (
-              <div className="flex-1 overflow-auto p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredCoins
-                    .slice(
-                      rowsPerPage === 0 ? 0 : page * rowsPerPage,
-                      rowsPerPage === 0 ? undefined : (page + 1) * rowsPerPage
-                    )
-                    .map((coin) => (
-                      <GridCard key={coin.id} coin={coin} />
-                    ))}
+          {/* Main content */}
+          <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {isLoading && tabCoins.length === 0 && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-sm text-zinc-500">Loading coin data...</p>
                 </div>
               </div>
             )}
-          </>
-        )}
-      </main>
+
+            {!isLoading && tabCoins.length === 0 && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <p className="text-zinc-500 mb-2">No coins match this view</p>
+                </div>
+              </div>
+            )}
+
+            {!isLoading && filteredCoins.length === 0 && tabCoins.length > 0 && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <p className="text-zinc-500 mb-2">No coins match your filters</p>
+                  <button
+                    onClick={() =>
+                      useScreenerStore.setState({
+                        search: "",
+                        filters: {
+                          marketCap: null,
+                          volume: null,
+                          pctFromATH: null,
+                          pctFromATL: null,
+                          athDateRange: null,
+                        },
+                      })
+                    }
+                    className="text-sm text-blue-500 hover:text-blue-400"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!isLoading && filteredCoins.length > 0 && (
+              <>
+                {layout === "table" ? (
+                  <DataTable data={filteredCoins} />
+                ) : (
+                  <div className="flex-1 overflow-auto p-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {filteredCoins
+                        .slice(
+                          rowsPerPage === 0 ? 0 : page * rowsPerPage,
+                          rowsPerPage === 0 ? undefined : (page + 1) * rowsPerPage
+                        )
+                        .map((coin) => (
+                          <GridCard key={coin.id} coin={coin} />
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </main>
+        </>
+      )}
     </>
   );
 }

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ScreenerState, SortState, Filters } from "@/types/coin";
+import type { ScreenerState, SortState, Filters, TabId } from "@/types/coin";
 
 const initialFilters: Filters = {
   marketCap: null,
@@ -22,6 +22,7 @@ export const useScreenerStore = create<ScreenerState>(() => ({
   currency: "usd",
   rowsPerPage: 100,
   page: 0,
+  activeTab: "glance",
 }));
 
 export function setSearch(search: string) {
@@ -57,4 +58,8 @@ export function setRowsPerPage(rowsPerPage: number) {
 
 export function setPage(page: number) {
   useScreenerStore.setState({ page });
+}
+
+export function setActiveTab(tab: TabId) {
+  useScreenerStore.setState({ activeTab: tab, page: 0 });
 }
