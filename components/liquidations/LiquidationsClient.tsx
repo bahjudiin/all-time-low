@@ -25,7 +25,12 @@ export function LiquidationsClient() {
   const activeTab = useLiqStore((s) => s.activeTab);
   const setActiveTab = useLiqStore((s) => s.setActiveTab);
 
-  const { data: bootstrap } = useSWR<LiquidationEvent[]>(
+  interface LiquidationApiResponse {
+  events: LiquidationEvent[];
+  meta: { binanceCount: number; okxCount: number; queriedAt: string };
+}
+
+const { data: bootstrap } = useSWR<LiquidationApiResponse>(
     "/api/liquidations",
     fetcher,
     {
@@ -47,8 +52,8 @@ export function LiquidationsClient() {
   }, []);
 
   useEffect(() => {
-    if (bootstrap && bootstrap.length > 0) {
-      useLiqStore.getState().addEvents(bootstrap);
+    if (bootstrap?.events && bootstrap.events.length > 0) {
+      useLiqStore.getState().addEvents(bootstrap.events);
     }
   }, [bootstrap]);
 

@@ -8,6 +8,7 @@ import { useScreenerStore, setActiveTab } from "@/lib/store";
 import { DataTable } from "./DataTable";
 import { Toolbar } from "./Toolbar";
 import { SignalsClient } from "@/components/signals/SignalsClient";
+import { PredictionClient } from "@/components/prediction/PredictionClient";
 import { isStable, isLowVolatility, hasNoMovement } from "@/lib/filters";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -141,6 +142,7 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
   const TABS: { id: TabId; label: string }[] = [
     { id: "all", label: "All Coins" },
     { id: "signals", label: "Signals" },
+    { id: "prediction", label: "Pre-Reversal" },
     { id: "near-ath", label: "Near ATH" },
     { id: "near-atl", label: "Near ATL" },
     { id: "gainers", label: "Gainers" },
@@ -171,6 +173,8 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
 
       {activeTab === "signals" ? (
         <SignalsClient />
+      ) : activeTab === "prediction" ? (
+        <PredictionClient />
       ) : (
         <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {isLoading && tabCoins.length === 0 && (

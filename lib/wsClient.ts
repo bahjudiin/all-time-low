@@ -4,7 +4,7 @@ type Status = "connecting" | "open" | "closed" | "reconnecting";
 type EventCb = (event: LiquidationEvent) => void;
 type StatusCb = (status: Status) => void;
 
-const URL = "wss://fstream.binance.com/market/!forceOrder@arr";
+const URL = "wss://fstream.binance.com/ws/!forceOrder@arr";
 const INITIAL_DELAY = 1000;
 const MAX_DELAY = 30000;
 const BACKOFF_FACTOR = 2;

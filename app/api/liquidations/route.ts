@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { fetchBinanceLiquidationHistory } from "@/lib/binance";
-import { fetchOKXLiquidationHistory } from "@/lib/okx";
-import { normalizeBinanceLiq } from "@/lib/normalize";
-import type { BinanceForceOrder } from "@/lib/normalize";
+import { fetchBinanceLiquidationHistory, type BinanceForceOrderItem } from "@/lib/binance";
+import { fetchOKXLiquidationHistory, type OKXLiquidationItem } from "@/lib/okx";
 import type { LiquidationEvent } from "@/types/liquidation";
 
 export const revalidate = 0;
@@ -10,53 +8,67 @@ export const revalidate = 0;
 const TOP_SYMBOLS = [
   "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT",
   "ADAUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT", "MATICUSDT",
-  "UNIUSDT", "SUIUSDT", "ARBUSDT", "OPUSDT", "NEARUSDT",
 ];
 
 export async function GET() {
   const now = Date.now();
   const oneHourAgo = now - 60 * 60 * 1000;
 
-  const [binanceRaw, okxRaw] = await Promise.all([
-    fetchBinanceLiquidationHistory({ startTime: oneHourAgo, limit: 200 }).catch(() => []),
-    fetchOKXLiquidationHistory({ state: "filled", limit: 100 }).catch(() => []),
-  ]);
+  const binanceEvents: LiquidationEvent[] = [];
+  const okxEvents: LiquidationEvent[] = [];
 
-  const binanceEvents: LiquidationEvent[] = binanceRaw
-    .map((raw) => {
-      const mapped: BinanceForceOrder = {
-        e: "forceOrder",
-        E: raw.time,
-        s: raw.symbol,
-        o: {
-          s: raw.symbol,
-          S: raw.side as "BUY" | "SELL",
-          o: "LIMIT",
-          f: "IOC",
-          q: raw.origQty,
-          p: raw.price,
-          ap: raw.avgPrice,
-          X: "FILLED",
-          l: raw.executedQty,
-          m: false,
-          T: raw.time,
-        },
-      };
-      return normalizeBinanceLiq(mapped);
-    });
+  const binanceResults = await Promise.allSettled(
+    TOP_SYMBOLS.map((symbol) =>
+      fetchBinanceLiquidationHistory({ symbol, startTime: oneHourAgo, limit: 100 })
+    )
+  );
 
-  const okxEvents: LiquidationEvent[] = okxRaw.map((raw) => ({
-    id: `okx-${raw.ts}-${raw.instId.split("-")[0]}-${Math.random().toString(36).slice(2, 8)}`,
-    ts: parseInt(raw.ts),
-    symbol: raw.instId.split("-")[0],
-    exchange: "okx" as const,
-    side: raw.side === "sell" ? ("long" as const) : ("short" as const),
-    qty: parseFloat(raw.bz),
-    price: parseFloat(raw.bkPx),
-    usdValue: parseFloat(raw.bkPx) * parseFloat(raw.bz),
-  }));
+  for (const result of binanceResults) {
+    if (result.status === "fulfilled" && result.value.length > 0) {
+      for (const raw of result.value) {
+        binanceEvents.push({
+          id: `binance-${raw.time}-${raw.symbol}-${Math.random().toString(36).slice(2, 8)}`,
+          ts: raw.time,
+          symbol: raw.symbol.replace("USDT", ""),
+          exchange: "binance",
+          side: raw.side === "SELL" ? "long" : "short",
+          qty: parseFloat(raw.executedQty),
+          price: parseFloat(raw.avgPrice),
+          usdValue: parseFloat(raw.avgPrice) * parseFloat(raw.executedQty),
+        });
+      }
+    }
+  }
+
+  try {
+    const okxRaw = await fetchOKXLiquidationHistory({ state: "filled", limit: 100 });
+    for (const raw of okxRaw) {
+      const symbol = raw.instId.split("-")[0];
+      const price = parseFloat(raw.bkPx);
+      const qty = parseFloat(raw.bz);
+      okxEvents.push({
+        id: `okx-${raw.ts}-${symbol}-${Math.random().toString(36).slice(2, 8)}`,
+        ts: parseInt(raw.ts),
+        symbol,
+        exchange: "okx",
+        side: raw.side === "sell" ? "long" : "short",
+        qty,
+        price,
+        usdValue: price * qty,
+      });
+    }
+  } catch {
+    // OKX fetch failed, continue with Binance data
+  }
 
   const all = [...binanceEvents, ...okxEvents].sort((a, b) => b.ts - a.ts);
 
-  return NextResponse.json(all.slice(0, 300));
+  return NextResponse.json({
+    events: all.slice(0, 300),
+    meta: {
+      binanceCount: binanceEvents.length,
+      okxCount: okxEvents.length,
+      queriedAt: new Date().toISOString(),
+    },
+  });
 }
