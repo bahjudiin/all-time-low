@@ -58,15 +58,46 @@ export const STABLECOINS = new Set([
   "diamond",
 ]);
 
-export const NEAR_ATH_THRESHOLD = -10;
-export const NEAR_ATL_THRESHOLD = 10;
+const NEAR_ATH_THRESHOLD = -5;
+const NEAR_ATL_THRESHOLD = 5;
+const EXTREME_ATH_PASSED = 0;
+const EXTREME_ATL_PASSED = 0;
+const LOW_VOLATILITY_THRESHOLD = 0.1;
+const ATH_ATL_MIN_RATIO = 1.1;
 
 export function isStable(coin: CoinWithDerived): boolean {
   return STABLECOINS.has(coin.symbol.toLowerCase());
 }
 
+export function isLowVolatility(coin: CoinWithDerived): boolean {
+  return Math.abs(coin.price_change_percentage_24h ?? 0) < LOW_VOLATILITY_THRESHOLD;
+}
+
+export function hasNoMovement(coin: CoinWithDerived): boolean {
+  if (coin.ath <= 0 || coin.atl <= 0) return false;
+  return coin.ath / coin.atl < ATH_ATL_MIN_RATIO;
+}
+
+export function isNearATH(coin: CoinWithDerived): boolean {
+  return coin.ath_change_percentage >= NEAR_ATH_THRESHOLD && coin.ath_change_percentage <= EXTREME_ATH_PASSED;
+}
+
+export function isPastATH(coin: CoinWithDerived): boolean {
+  return coin.ath_change_percentage > EXTREME_ATH_PASSED;
+}
+
+export function isNearATL(coin: CoinWithDerived): boolean {
+  return coin.atl_change_percentage <= NEAR_ATL_THRESHOLD && coin.atl_change_percentage >= EXTREME_ATL_PASSED;
+}
+
+export function isPastATL(coin: CoinWithDerived): boolean {
+  return coin.atl_change_percentage < EXTREME_ATL_PASSED;
+}
+
 export function isExtreme(coin: CoinWithDerived): boolean {
-  const nearAth = coin.ath_change_percentage >= NEAR_ATH_THRESHOLD;
-  const nearAtl = coin.atl_change_percentage <= NEAR_ATL_THRESHOLD;
-  return nearAth || nearAtl;
+  return (isNearATH(coin) || isPastATH(coin) || isNearATL(coin) || isPastATL(coin)) && !hasNoMovement(coin);
+}
+
+export function isNearOrPastATHATL(coin: CoinWithDerived): boolean {
+  return isExtreme(coin);
 }

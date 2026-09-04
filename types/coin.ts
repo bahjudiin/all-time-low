@@ -32,6 +32,14 @@ export interface CoinMarket {
 export interface CoinDerived {
   pctToATH: number;
   volatilityProxy: number;
+  liquidation24h: LiquidationData;
+}
+
+export interface LiquidationData {
+  totalPct: number;
+  longPct: number;
+  shortPct: number;
+  netDirection: "long" | "short" | "neutral";
 }
 
 export type CoinWithDerived = CoinMarket & CoinDerived;
@@ -51,7 +59,7 @@ export interface Filters {
   athDateRange: [string, string] | null;
 }
 
-export type TabId = "glance" | "all-time-high" | "gainers" | "losers" | "near-ath" | "near-atl";
+export type TabId = "all" | "gainers" | "losers" | "near-ath" | "near-atl" | "biggest-drop" | "signals";
 
 export interface ScreenerState {
   search: string;

@@ -14,7 +14,7 @@ export const revalidate = 60;
 export default async function Home() {
   let coins: Awaited<ReturnType<typeof fetchCoinsMarkets>> = [];
   try {
-    coins = await fetchCoinsMarkets("usd", 100, 1);
+    coins = await fetchCoinsMarkets("usd", 250, 1);
   } catch (e) {
     console.error("Failed to fetch coins:", e);
   }

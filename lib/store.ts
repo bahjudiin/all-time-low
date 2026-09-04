@@ -22,7 +22,7 @@ export const useScreenerStore = create<ScreenerState>(() => ({
   currency: "usd",
   rowsPerPage: 100,
   page: 0,
-  activeTab: "glance",
+  activeTab: "near-ath",
 }));
 
 export function setSearch(search: string) {

@@ -7,8 +7,8 @@ import { computeDerived } from "@/lib/coingecko";
 import { useScreenerStore, setActiveTab } from "@/lib/store";
 import { DataTable } from "./DataTable";
 import { Toolbar } from "./Toolbar";
-import { MarketGlance } from "./MarketGlance";
-import { isStable } from "@/lib/filters";
+import { SignalsClient } from "@/components/signals/SignalsClient";
+import { isStable, isLowVolatility, hasNoMovement } from "@/lib/filters";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -58,32 +58,32 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
     if (!rawCoins) return [];
     return rawCoins
       .map((coin) => ({ ...coin, ...computeDerived(coin) }))
-      .filter((c) => !isStable(c));
+      .filter((c) => !isStable(c) && !isLowVolatility(c) && !hasNoMovement(c));
   }, [rawCoins]);
 
   const tabCoins = useMemo(() => {
-    const movers = [...coins].sort(
-      (a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h
-    );
-    const losers = [...coins].sort(
-      (a, b) => a.price_change_percentage_24h - b.price_change_percentage_24h
-    );
     switch (activeTab) {
-      case "all-time-high":
-        return [...coins].sort((a, b) => b.market_cap - a.market_cap);
       case "gainers":
-        return movers;
+        return [...coins].sort(
+          (a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h
+        );
       case "losers":
-        return losers;
+        return [...coins].sort(
+          (a, b) => a.price_change_percentage_24h - b.price_change_percentage_24h
+        );
       case "near-ath":
-        return coins
+        return [...coins]
           .filter((c) => c.ath_change_percentage >= -15 && c.ath_change_percentage < 0)
           .sort((a, b) => b.market_cap - a.market_cap);
       case "near-atl":
-        return coins
+        return [...coins]
           .filter((c) => c.atl_change_percentage <= 15 && c.atl_change_percentage > 0)
           .sort((a, b) => b.market_cap - a.market_cap);
-      case "glance":
+      case "biggest-drop":
+        return [...coins]
+          .sort((a, b) => a.ath_change_percentage - b.ath_change_percentage)
+          .slice(0, 20);
+      case "all":
       default:
         return [...coins].sort((a, b) => b.market_cap - a.market_cap);
     }
@@ -139,15 +139,14 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
   }, [filters]);
 
   const TABS: { id: TabId; label: string }[] = [
-    { id: "glance", label: "Market Glance" },
-    { id: "all-time-high", label: "All-Time High" },
+    { id: "all", label: "All Coins" },
+    { id: "signals", label: "Signals" },
     { id: "near-ath", label: "Near ATH" },
     { id: "near-atl", label: "Near ATL" },
-    { id: "gainers", label: "Gainers (24h)" },
-    { id: "losers", label: "Losers (24h)" },
+    { id: "gainers", label: "Gainers" },
+    { id: "losers", label: "Losers" },
+    { id: "biggest-drop", label: "Biggest Drop" },
   ];
-
-  const isGlance = activeTab === "glance";
 
   return (
     <>
@@ -168,79 +167,75 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
         ))}
       </div>
 
-      {isGlance ? (
-        <MarketGlance coins={coins} />
+      <Toolbar data={filteredCoins} activeFilterCount={activeFilterCount} />
+
+      {activeTab === "signals" ? (
+        <SignalsClient />
       ) : (
-        <>
-          {/* Toolbar */}
-          <Toolbar data={filteredCoins} activeFilterCount={activeFilterCount} />
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {isLoading && tabCoins.length === 0 && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-zinc-500">Loading coin data...</p>
+            </div>
+          </div>
+        )}
 
-          {/* Main content */}
-          <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            {isLoading && tabCoins.length === 0 && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-sm text-zinc-500">Loading coin data...</p>
+        {!isLoading && tabCoins.length === 0 && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-zinc-500 mb-2">No extreme coins found</p>
+            </div>
+          </div>
+        )}
+
+        {!isLoading && filteredCoins.length === 0 && tabCoins.length > 0 && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-zinc-500 mb-2">No coins match your filters</p>
+              <button
+                onClick={() =>
+                  useScreenerStore.setState({
+                    search: "",
+                    filters: {
+                      marketCap: null,
+                      volume: null,
+                      pctFromATH: null,
+                      pctFromATL: null,
+                      athDateRange: null,
+                    },
+                  })
+                }
+                className="text-sm text-blue-500 hover:text-blue-400"
+              >
+                Clear all filters
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isLoading && filteredCoins.length > 0 && (
+          <>
+            {layout === "table" ? (
+              <DataTable data={filteredCoins} />
+            ) : (
+              <div className="flex-1 overflow-auto p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredCoins
+                    .slice(
+                      rowsPerPage === 0 ? 0 : page * rowsPerPage,
+                      rowsPerPage === 0 ? undefined : (page + 1) * rowsPerPage
+                    )
+                    .map((coin) => (
+                      <GridCard key={coin.id} coin={coin} />
+                    ))}
                 </div>
               </div>
             )}
-
-            {!isLoading && tabCoins.length === 0 && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-zinc-500 mb-2">No coins match this view</p>
-                </div>
-              </div>
-            )}
-
-            {!isLoading && filteredCoins.length === 0 && tabCoins.length > 0 && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-zinc-500 mb-2">No coins match your filters</p>
-                  <button
-                    onClick={() =>
-                      useScreenerStore.setState({
-                        search: "",
-                        filters: {
-                          marketCap: null,
-                          volume: null,
-                          pctFromATH: null,
-                          pctFromATL: null,
-                          athDateRange: null,
-                        },
-                      })
-                    }
-                    className="text-sm text-blue-500 hover:text-blue-400"
-                  >
-                    Clear all filters
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!isLoading && filteredCoins.length > 0 && (
-              <>
-                {layout === "table" ? (
-                  <DataTable data={filteredCoins} />
-                ) : (
-                  <div className="flex-1 overflow-auto p-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {filteredCoins
-                        .slice(
-                          rowsPerPage === 0 ? 0 : page * rowsPerPage,
-                          rowsPerPage === 0 ? undefined : (page + 1) * rowsPerPage
-                        )
-                        .map((coin) => (
-                          <GridCard key={coin.id} coin={coin} />
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </main>
-        </>
+          </>
+        )}
+      </main>
       )}
     </>
   );

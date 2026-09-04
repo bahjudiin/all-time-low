@@ -138,6 +138,35 @@ const columns = [
     ),
     size: 110,
   }),
+  columnHelper.accessor("liquidation24h", {
+    header: () => (
+      <span title="Estimated liquidations in the last 24 hours">
+        Liq 24h
+      </span>
+    ),
+    cell: (info) => {
+      const liq = info.getValue();
+      const dirColor =
+        liq.netDirection === "long"
+          ? "text-red-500"
+          : liq.netDirection === "short"
+            ? "text-green-500"
+            : "text-zinc-500";
+      return (
+        <div className="flex flex-col text-xs leading-tight">
+          <span className={`font-semibold ${dirColor}`}>
+            {liq.totalPct.toFixed(1)}%
+          </span>
+          <span className="text-zinc-400">
+            L:{liq.longPct.toFixed(1)} / S:{liq.shortPct.toFixed(1)}
+          </span>
+        </div>
+      );
+    },
+    sortingFn: (a, b) =>
+      a.original.liquidation24h.totalPct - b.original.liquidation24h.totalPct,
+    size: 110,
+  }),
   columnHelper.accessor("total_volume", {
     header: "Volume (24h)",
     cell: (info) => (
