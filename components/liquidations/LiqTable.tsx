@@ -6,7 +6,7 @@ import {
   getSortedRowModel,
   getFilteredRowModel,
   flexRender,
-  createColumnHelper,
+  type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
 import { useState, useMemo } from "react";
@@ -36,46 +36,46 @@ function SortIcon({ sorted }: { sorted: false | "asc" | "desc" }) {
   return <ChevronsUpDown className="w-3 h-3 inline ml-1 opacity-40" />;
 }
 
-function buildColumns(showExchange: boolean) {
-  const h = createColumnHelper<LiquidationEvent>();
-
-  const cols = [
-    h.accessor("ts", {
+function buildColumns(showExchange: boolean): ColumnDef<LiquidationEvent>[] {
+  const cols: ColumnDef<LiquidationEvent>[] = [
+    {
+      accessorKey: "ts",
       header: "Time",
       cell: (info) => (
-        <span className="text-xs text-zinc-400">{relativeTime(info.getValue())}</span>
+        <span className="text-xs text-zinc-400">{relativeTime(info.getValue() as number)}</span>
       ),
       sortingFn: "basic",
       size: 90,
-    }),
-    h.accessor("symbol", {
+    },
+    {
+      accessorKey: "symbol",
       header: "Symbol",
       cell: (info) => (
-        <span className="text-sm font-medium">{info.getValue()}</span>
+        <span className="text-sm font-medium">{info.getValue() as string}</span>
       ),
       size: 100,
-    }),
+    },
   ];
 
   if (showExchange) {
-    cols.push(
-      h.accessor("exchange", {
-        header: "Exchange",
-        cell: (info) => (
-          <span className="text-xs text-zinc-500 uppercase">
-            {info.getValue()}
-          </span>
-        ),
-        size: 100,
-      })
-    );
+    cols.push({
+      accessorKey: "exchange",
+      header: "Exchange",
+      cell: (info) => (
+        <span className="text-xs text-zinc-500 uppercase">
+          {info.getValue() as string}
+        </span>
+      ),
+      size: 100,
+    });
   }
 
   cols.push(
-    h.accessor("side", {
+    {
+      accessorKey: "side",
       header: "Side",
       cell: (info) => {
-        const side = info.getValue();
+        const side = info.getValue() as string;
         const cls =
           side === "long"
             ? "bg-green-500/20 text-green-400"
@@ -89,26 +89,31 @@ function buildColumns(showExchange: boolean) {
         );
       },
       size: 80,
-    }),
-    h.accessor("usdValue", {
+    },
+    {
+      accessorKey: "usdValue",
       header: "Size USD",
       cell: (info) => (
         <span className="text-sm text-zinc-300">
-          ${formatCompact(info.getValue())}
+          ${formatCompact(info.getValue() as number)}
         </span>
       ),
       sortingFn: "basic",
       size: 110,
-    }),
-    h.accessor("price", {
+    },
+    {
+      accessorKey: "price",
       header: "Price",
-      cell: (info) => (
-        <span className="text-sm text-zinc-300">
-          ${info.getValue().toFixed(getPriceDecimals(info.getValue()))}
-        </span>
-      ),
+      cell: (info) => {
+        const val = info.getValue() as number;
+        return (
+          <span className="text-sm text-zinc-300">
+            ${val.toFixed(getPriceDecimals(val))}
+          </span>
+        );
+      },
       size: 120,
-    })
+    }
   );
 
   return cols;

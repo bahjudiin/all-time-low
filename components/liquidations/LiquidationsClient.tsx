@@ -5,9 +5,9 @@ import { useEffect } from "react";
 import type { LiquidationEvent, LiqTab } from "@/types/liquidation";
 import { useLiqStore } from "@/lib/liquidationStore";
 import { getLiquidationWS } from "@/lib/wsClient";
-import { LiqTable } from "./LiqTable";
+import { MarketGlance } from "./MarketGlance";
 import { LiqFiltersBar } from "./Filters";
-import { MarketGlance } from "@/components/screener/MarketGlance";
+import { RealTimeFeed } from "./RealTimeFeed";
 import { HistoryTab } from "./HistoryTab";
 import { MatrixView } from "./MatrixView";
 import { SweepsTab } from "./SweepsTab";
@@ -24,7 +24,6 @@ const TABS: { id: LiqTab; label: string }[] = [
 export function LiquidationsClient() {
   const activeTab = useLiqStore((s) => s.activeTab);
   const setActiveTab = useLiqStore((s) => s.setActiveTab);
-  const events = useLiqStore((s) => s.events);
 
   const { data: bootstrap } = useSWR<LiquidationEvent[]>(
     "/api/liquidations",
@@ -59,7 +58,9 @@ export function LiquidationsClient() {
         <h1 className="text-lg font-semibold">Liquidation Intelligence</h1>
       </div>
 
-      <MarketGlance />
+      <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
+        <MarketGlance />
+      </div>
 
       <div className="flex items-center gap-1 px-6 py-2 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto">
         {TABS.map((tab) => (
@@ -80,7 +81,7 @@ export function LiquidationsClient() {
       <LiqFiltersBar />
 
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {activeTab === "realtime" && <LiqTable data={events} />}
+        {activeTab === "realtime" && <RealTimeFeed />}
         {activeTab === "history" && <HistoryTab />}
         {activeTab === "matrix" && <MatrixView />}
         {activeTab === "sweeps" && <SweepsTab />}
