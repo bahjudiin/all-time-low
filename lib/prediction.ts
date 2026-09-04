@@ -486,10 +486,12 @@ export function computeExhaustionFactors(
 
 interface ClusterVote {
   name: string;
-  vote: -1 | 0 | 1; // -1 = bearish/exhaustion, 0 = neutral, 1 = bullish/continuation
-  confidence: number; // 0-1 how strongly this cluster votes
-  factors: string[]; // what contributed to this vote
+  vote: -1 | 0 | 1;
+  confidence: number;
+  factors: string[];
 }
+
+export type { ClusterVote };
 
 // ── Cluster Evaluation ──────────────────────────────────────────────
 
@@ -1128,6 +1130,14 @@ export function computePrediction(
     distanceToZone: Math.round(distanceToZone * 10000) / 10000,
     distanceToZonePct: Math.round(distanceToZonePct * 100) / 100,
     factors,
+    clusterVotes: clusters.map((c) => ({
+      name: c.name,
+      vote: c.vote,
+      confidence: Math.round(c.confidence * 100),
+      factors: c.factors,
+    })),
+    agreeingClusters,
+    conflictingClusters,
     supportingFactors: supporting,
     warningFactors: warnings,
     lastUpdate: Date.now(),

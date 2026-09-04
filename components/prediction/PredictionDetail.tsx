@@ -162,6 +162,74 @@ export function PredictionDetail({ prediction, onClose }: PredictionDetailProps)
         color="bg-blue-500"
       />
 
+      {/* Cluster Confluence */}
+      <SectionTitle>Cluster Confluence</SectionTitle>
+      <div className="mb-3 space-y-1.5">
+        {p.clusterVotes.map((cluster) => {
+          const expectedVote = p.direction === "SHORT" ? -1 : 1;
+          const isAgreeing = cluster.vote === expectedVote;
+          const isConflicting = cluster.vote !== 0 && cluster.vote !== expectedVote;
+          const isNeutral = cluster.vote === 0;
+
+          return (
+            <div
+              key={cluster.name}
+              className={`rounded-lg p-2 border ${
+                isAgreeing
+                  ? "border-green-500/30 bg-green-500/5"
+                  : isConflicting
+                  ? "border-red-500/30 bg-red-500/5"
+                  : "border-zinc-800 bg-zinc-900/30"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isAgreeing ? "bg-green-500" : isConflicting ? "bg-red-500" : "bg-zinc-600"
+                    }`}
+                  />
+                  <span className="text-[11px] font-medium text-foreground">{cluster.name}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-mono ${
+                    isAgreeing ? "text-green-400" : isConflicting ? "text-red-400" : "text-zinc-500"
+                  }`}>
+                    {isAgreeing ? "AGREES" : isConflicting ? "CONFLICTS" : "NEUTRAL"}
+                  </span>
+                  <div className="w-8 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${
+                        isAgreeing ? "bg-green-500" : isConflicting ? "bg-red-500" : "bg-zinc-600"
+                      }`}
+                      style={{ width: `${cluster.confidence}%` }}
+                    />
+                  </div>
+                  <span className="text-[9px] font-mono text-zinc-500">{cluster.confidence}%</span>
+                </div>
+              </div>
+              {cluster.factors.length > 0 && (
+                <div className="space-y-0.5 ml-3.5">
+                  {cluster.factors.map((factor, i) => (
+                    <div key={i} className={`text-[10px] ${
+                      isAgreeing ? "text-green-400/70" : isConflicting ? "text-red-400/70" : "text-zinc-500"
+                    }`}>
+                      {factor}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-1">
+          <span>{p.agreeingClusters} agreeing / {p.conflictingClusters} conflicting</span>
+          <span className={p.conflictingClusters > 0 ? "text-amber-400" : "text-green-400"}>
+            {p.conflictingClusters === 0 ? "No conflicts" : `${p.conflictingClusters} conflict${p.conflictingClusters > 1 ? "s" : ""} reducing confidence`}
+          </span>
+        </div>
+      </div>
+
       {/* Zone & Levels */}
       <SectionTitle>Zone & Levels</SectionTitle>
       <div className="grid grid-cols-2 gap-2 mb-3">

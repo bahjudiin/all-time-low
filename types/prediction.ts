@@ -137,6 +137,13 @@ export interface LimitLevels {
   l3: number;
 }
 
+export interface ClusterVoteInfo {
+  name: string;
+  vote: -1 | 0 | 1;
+  confidence: number;
+  factors: string[];
+}
+
 export interface CoinPrediction {
   symbol: string;
   name: string;
@@ -162,6 +169,9 @@ export interface CoinPrediction {
   distanceToZonePct: number;
 
   factors: ExhaustionFactors;
+  clusterVotes: ClusterVoteInfo[];
+  agreeingClusters: number;
+  conflictingClusters: number;
   supportingFactors: string[];
   warningFactors: string[];
 
