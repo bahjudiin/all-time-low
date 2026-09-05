@@ -1,159 +1,113 @@
 "use client";
 
-import { useMemo } from "react";
 import type { CoinWithDerived } from "@/types/coin";
-import { formatUSD, formatPercentValue, formatCompact } from "@/lib/format";
-import { isStable, isExtreme } from "@/lib/filters";
-import { Sparkline } from "./Sparkline";
 
 interface MarketGlanceProps {
   coins: CoinWithDerived[];
 }
 
 export function MarketGlance({ coins }: MarketGlanceProps) {
-  const stats = useMemo(() => {
-    const movers = coins.filter((c) => !isStable(c));
-    const top = [...movers].sort((a, b) => b.market_cap - a.market_cap).slice(0, 5);
-    const gainers = [...movers].sort(
-      (a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h
-    );
-    const losers = [...movers].sort(
-      (a, b) => a.price_change_percentage_24h - b.price_change_percentage_24h
-    );
-    const nearAth = movers.filter((c) => isExtreme(c) && c.ath_change_percentage >= -5);
-    const totalMcap = movers.reduce((s, c) => s + (c.market_cap || 0), 0);
-    const totalVolume = movers.reduce((s, c) => s + (c.total_volume || 0), 0);
-    const avg24h = movers.length
-      ? movers.reduce((s, c) => s + c.price_change_percentage_24h, 0) / movers.length
-      : 0;
+  if (coins.length === 0) return null;
 
-    return {
-      top,
-      gainers: gainers.slice(0, 5),
-      losers: losers.slice(0, 5),
-      nearAthCount: nearAth.length,
-      totalMcap,
-      totalVolume,
-      avg24h,
-      coinCount: movers.length,
-    };
-  }, [coins]);
+  const totalMarketCap = coins.reduce((s, c) => s + c.market_cap, 0);
+  const totalVolume = coins.reduce((s, c) => s + c.total_volume, 0);
+  const avgChange24h = coins.reduce((s, c) => s + c.price_change_percentage_24h, 0) / coins.length;
 
-  const statCards = [
-    { label: "Coins Tracked", value: stats.coinCount.toLocaleString(), accent: "" },
-    { label: "Total Market Cap", value: `$${formatCompact(stats.totalMcap)}`, accent: "" },
-    { label: "24h Volume", value: `$${formatCompact(stats.totalVolume)}`, accent: "" },
-    { label: "Avg 24h Change", value: formatPercentValue(stats.avg24h), accent: stats.avg24h >= 0 ? "text-green-500" : "text-red-500" },
-    { label: "Near ATH (<5%)", value: stats.nearAthCount.toString(), accent: "text-blue-500" },
-  ];
+  const nearATH = coins.filter((c) => c.ath_change_percentage >= -15 && c.ath_change_percentage < 0).length;
+  const nearATL = coins.filter((c) => c.atl_change_percentage <= 15 && c.atl_change_percentage > 0).length;
+  const aboveATH = coins.filter((c) => c.ath_change_percentage >= 0).length;
+  const deepRed = coins.filter((c) => c.ath_change_percentage <= -80).length;
+  const strongPump = coins.filter((c) => c.price_change_percentage_24h > 10).length;
+  const strongDump = coins.filter((c) => c.price_change_percentage_24h < -10).length;
+
+  const avgATHDistance = coins.reduce((s, c) => s + c.ath_change_percentage, 0) / coins.length;
+  const avgATLDistance = coins.reduce((s, c) => s + c.atl_change_percentage, 0) / coins.length;
+
+  const biggestGainer = [...coins].sort((a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h)[0];
+  const biggestLoser = [...coins].sort((a, b) => a.price_change_percentage_24h - b.price_change_percentage_24h)[0];
+
+  const formatCompact = (n: number) => {
+    if (n >= 1e12) return `$${(n / 1e12).toFixed(1)}T`;
+    if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+    return `$${n.toLocaleString()}`;
+  };
 
   return (
-    <div className="flex-1 overflow-auto p-5 space-y-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {statCards.map((card) => (
-          <div
-            key={card.label}
-            className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4"
-          >
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-              {card.label}
-            </div>
-            <div className={`text-xl font-semibold mt-1 ${card.accent}`}>
-              {card.value}
-            </div>
+    <div className="px-6 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+      <div className="flex items-center gap-6 overflow-x-auto text-xs">
+        {/* Market Overview */}
+        <div className="flex items-center gap-4">
+          <div>
+            <span className="text-zinc-500">MCap </span>
+            <span className="font-mono font-medium text-foreground">{formatCompact(totalMarketCap)}</span>
           </div>
-        ))}
+          <div>
+            <span className="text-zinc-500">Vol </span>
+            <span className="font-mono font-medium text-foreground">{formatCompact(totalVolume)}</span>
+          </div>
+          <div>
+            <span className="text-zinc-500">Avg </span>
+            <span className={`font-mono font-medium ${avgChange24h >= 0 ? "text-green-400" : "text-red-400"}`}>
+              {avgChange24h >= 0 ? "+" : ""}{avgChange24h.toFixed(2)}%
+            </span>
+          </div>
+        </div>
+
+        <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700" />
+
+        {/* ATH/ATL Stats */}
+        <div className="flex items-center gap-4">
+          <div>
+            <span className="text-zinc-500">ATH dist </span>
+            <span className="font-mono text-amber-400">{avgATHDistance.toFixed(1)}%</span>
+          </div>
+          <div>
+            <span className="text-zinc-500">ATL dist </span>
+            <span className="font-mono text-green-400">+{avgATLDistance.toFixed(1)}%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="text-green-400 font-medium">{aboveATH} above ATH</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+            <span className="text-amber-400">{nearATH} near ATH</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="text-blue-400">{nearATL} near ATL</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-red-500" />
+            <span className="text-red-400">{deepRed} deep red (-80%+)</span>
+          </div>
+        </div>
+
+        <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-700" />
+
+        {/* 24h Action */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="text-green-400 font-medium">{strongPump} pump 10%+</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-red-400 font-medium">{strongDump} dump 10%+</span>
+          </div>
+          {biggestGainer && (
+            <div>
+              <span className="text-zinc-500">Top: </span>
+              <span className="text-green-400 font-medium">{biggestGainer.symbol.toUpperCase()} +{biggestGainer.price_change_percentage_24h.toFixed(1)}%</span>
+            </div>
+          )}
+          {biggestLoser && (
+            <div>
+              <span className="text-zinc-500">Bot: </span>
+              <span className="text-red-400 font-medium">{biggestLoser.symbol.toUpperCase()} {biggestLoser.price_change_percentage_24h.toFixed(1)}%</span>
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* Leading coins with sparklines */}
-      <section>
-        <h2 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
-          Leading Coins
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {stats.top.map((coin) => (
-            <div
-              key={coin.id}
-              className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 hover:border-blue-500/50 transition-colors"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <img src={coin.image} alt={coin.name} className="w-6 h-6 rounded-full" loading="lazy" />
-                <span className="font-medium text-sm truncate">{coin.name}</span>
-              </div>
-              <div className="text-lg font-semibold">{formatUSD(coin.current_price)}</div>
-              <div
-                className={`text-xs font-medium ${
-                  coin.price_change_percentage_24h >= 0 ? "text-green-500" : "text-red-500"
-                }`}
-              >
-                {formatPercentValue(coin.price_change_percentage_24h)} (24h)
-              </div>
-              <div className="mt-3 -mx-3">
-                <Sparkline data={coin.sparkline_in_7d?.price ?? []} width={100} height={28} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Gainers vs Losers */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div>
-          <h2 className="text-sm font-medium text-green-600 dark:text-green-400 mb-3">
-            Top Gainers (24h)
-          </h2>
-          <div className="space-y-1">
-            {stats.gainers.map((coin, i) => (
-              <div
-                key={coin.id}
-                className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-xs text-zinc-400 w-4">{i + 1}</span>
-                  <img src={coin.image} alt="" className="w-5 h-5 rounded-full" loading="lazy" />
-                  <span className="text-sm truncate">{coin.name}</span>
-                  <span className="text-xs text-zinc-400 uppercase">{coin.symbol}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                    {formatUSD(coin.current_price)}
-                  </span>
-                  <span className="text-sm font-medium text-green-500 w-16 text-right">
-                    {formatPercentValue(coin.price_change_percentage_24h)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <h2 className="text-sm font-medium text-red-500 mb-3">Top Losers (24h)</h2>
-          <div className="space-y-1">
-            {stats.losers.map((coin, i) => (
-              <div
-                key={coin.id}
-                className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-xs text-zinc-400 w-4">{i + 1}</span>
-                  <img src={coin.image} alt="" className="w-5 h-5 rounded-full" loading="lazy" />
-                  <span className="text-sm truncate">{coin.name}</span>
-                  <span className="text-xs text-zinc-400 uppercase">{coin.symbol}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                    {formatUSD(coin.current_price)}
-                  </span>
-                  <span className="text-sm font-medium text-red-500 w-16 text-right">
-                    {formatPercentValue(coin.price_change_percentage_24h)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
