@@ -12,6 +12,7 @@ import { Toolbar } from "./Toolbar";
 import { MarketGlance } from "./MarketGlance";
 import { isStable, isLowVolatility, hasNoMovement } from "@/lib/filters";
 import { SignalCardDetailed } from "@/components/signals/SignalCardDetailed";
+import { OvervaluedUndervaluedClient } from "@/components/overvalued/OvervaluedUndervaluedClient";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -326,6 +327,8 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
             )}
           </main>
         </>
+      ) : activeTab === "overvalued-undervalued" ? (
+        <OvervaluedUndervaluedClient />
       ) : (
         <>
           <Toolbar data={filteredCoins} activeFilterCount={activeFilterCount} />

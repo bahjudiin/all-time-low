@@ -264,6 +264,33 @@ export async function fetchBinanceData(symbol: string) {
   };
 }
 
+export async function fetchBinanceMultiTimeframeData(symbol: string) {
+  const [klines15m, klines1h, klines4h, fundingRate, openInterest, globalRatio, topRatio, topPositionRatio, takerRatio] =
+    await Promise.all([
+      fetchKlines(symbol, "15m", 200),
+      fetchKlines(symbol, "1h", 500),
+      fetchKlines(symbol, "4h", 300),
+      fetchFundingRate(symbol),
+      fetchOpenInterest(symbol),
+      fetchGlobalLongShortRatio(symbol),
+      fetchTopLongShortRatio(symbol),
+      fetchTopPositionRatio(symbol),
+      fetchTakerLongShortRatio(symbol),
+    ]);
+
+  return {
+    klines15m,
+    klines1h,
+    klines4h,
+    fundingRate,
+    openInterest,
+    globalRatio,
+    topRatio,
+    topPositionRatio,
+    takerRatio,
+  };
+}
+
 export type BinanceForceOrderItem = {
   symbol: string;
   price: string;
