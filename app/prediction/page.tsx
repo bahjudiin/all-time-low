@@ -30,12 +30,6 @@ export default function PredictionPage() {
             >
               Pre-Reversal
             </Link>
-            <Link
-              href="/liquidations"
-              className="px-3 py-1.5 text-sm font-medium rounded-md text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-            >
-              Liquidations
-            </Link>
           </nav>
         </div>
       </header>
