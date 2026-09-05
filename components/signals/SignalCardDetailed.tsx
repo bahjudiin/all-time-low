@@ -120,6 +120,61 @@ export function SignalCardDetailed({ coin, signals }: SignalCardDetailedProps) {
         </div>
       </div>
 
+      {/* Price Targets L1 / L2 / L3 */}
+      {signals.priceTargets && (
+        <div className="mx-4 mb-3">
+          <div className={`rounded-lg p-2.5 ${
+            isLong ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-red-500/10 border border-red-500/20"
+          }`}>
+            <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">
+              Limit Levels ({isLong ? "Long" : "Short"})
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="text-center">
+                <div className="text-[9px] text-zinc-500 mb-0.5">L1</div>
+                <div className={`text-[11px] font-mono font-bold ${isLong ? "text-emerald-400" : "text-red-400"}`}>
+                  ${signals.priceTargets.l1.price.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                </div>
+                <div className={`text-[9px] font-mono ${signals.priceTargets.l1.distance > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  {signals.priceTargets.l1.distance > 0 ? "+" : ""}{signals.priceTargets.l1.distance}%
+                </div>
+                <div className="text-[8px] text-zinc-600 truncate">{signals.priceTargets.l1.source}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[9px] text-zinc-500 mb-0.5">L2</div>
+                <div className={`text-[11px] font-mono font-bold ${isLong ? "text-emerald-400" : "text-red-400"}`}>
+                  ${signals.priceTargets.l2.price.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                </div>
+                <div className={`text-[9px] font-mono ${signals.priceTargets.l2.distance > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  {signals.priceTargets.l2.distance > 0 ? "+" : ""}{signals.priceTargets.l2.distance}%
+                </div>
+                <div className="text-[8px] text-zinc-600 truncate">{signals.priceTargets.l2.source}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[9px] text-zinc-500 mb-0.5">L3</div>
+                <div className={`text-[11px] font-mono font-bold ${isLong ? "text-emerald-400" : "text-red-400"}`}>
+                  ${signals.priceTargets.l3.price.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                </div>
+                <div className={`text-[9px] font-mono ${signals.priceTargets.l3.distance > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  {signals.priceTargets.l3.distance > 0 ? "+" : ""}{signals.priceTargets.l3.distance}%
+                </div>
+                <div className="text-[8px] text-zinc-600 truncate">{signals.priceTargets.l3.source}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[9px] text-zinc-500 mb-0.5">Stop</div>
+                <div className="text-[11px] font-mono font-bold text-amber-400">
+                  ${signals.priceTargets.invalidation.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                </div>
+                <div className={`text-[9px] font-mono ${isLong ? "text-red-400" : "text-emerald-400"}`}>
+                  {isLong ? "↓" : "↑"} Invalid
+                </div>
+                <div className="text-[8px] text-zinc-600">BB Opp</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Volume & Market Cap */}
       <div className="mx-4 mb-3 grid grid-cols-3 gap-2">
         <div className="rounded-lg bg-zinc-900/50 p-2 text-center">

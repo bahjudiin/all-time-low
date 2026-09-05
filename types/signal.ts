@@ -128,6 +128,21 @@ export interface IndicatorGroup {
   agreed: boolean;
 }
 
+// ── Price Target Types ─────────────────────────────────────────────
+
+export interface PriceLevel {
+  price: number;
+  distance: number;   // % from current
+  source: string;     // e.g. "Bollinger Upper", "ATR Extension"
+}
+
+export interface PriceTargets {
+  l1: PriceLevel;     // Conservative — nearest level
+  l2: PriceLevel;     // Moderate — extension target
+  l3: PriceLevel;     // Aggressive — ATH/ATL or major level
+  invalidation: number; // Stop level
+}
+
 // ── Composite Signal Types ─────────────────────────────────────────
 
 export type SignalDirection = "strong_long" | "long" | "lean_long" | "wait" | "lean_short" | "short" | "strong_short";
@@ -145,6 +160,7 @@ export interface CoinSignals {
   direction: SignalDirection;
   agreementPct: number;
   athAtl?: ATHATLResult;
+  priceTargets?: PriceTargets;
 }
 
 export interface BinanceKline {

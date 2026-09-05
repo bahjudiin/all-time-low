@@ -95,6 +95,12 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
         return [...coins].sort((a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h).slice(0, 30);
       case "biggest-dump":
         return [...coins].sort((a, b) => a.price_change_percentage_24h - b.price_change_percentage_24h).slice(0, 30);
+      case "overvalued-undervalued":
+        return [...coins].sort((a, b) => {
+          const aScore = (a.atl_change_percentage * -0.6) + (a.price_change_percentage_24h * -0.4);
+          const bScore = (b.atl_change_percentage * -0.6) + (b.price_change_percentage_24h * -0.4);
+          return bScore - aScore;
+        });
       case "all":
       default:
         return [...coins].sort((a, b) => b.market_cap - a.market_cap);
@@ -190,6 +196,7 @@ export function ScreenerClient({ initialCoins }: ScreenerClientProps) {
     { id: "biggest-pump", label: "Pump", icon: "🚀" },
     { id: "biggest-dump", label: "Dump", icon: "💥" },
     { id: "biggest-drop", label: "From ATH" },
+    { id: "overvalued-undervalued", label: "O/U", icon: "📊" },
   ];
 
   const handleSignalSearch = useCallback((value: string) => {

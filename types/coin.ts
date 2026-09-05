@@ -59,7 +59,7 @@ export interface Filters {
   athDateRange: [string, string] | null;
 }
 
-export type TabId = "all" | "gainers" | "losers" | "near-ath" | "near-atl" | "biggest-drop" | "biggest-pump" | "biggest-dump" | "ath-signals";
+export type TabId = "all" | "gainers" | "losers" | "near-ath" | "near-atl" | "biggest-drop" | "biggest-pump" | "biggest-dump" | "ath-signals" | "overvalued-undervalued";
 
 export interface ScreenerState {
   search: string;

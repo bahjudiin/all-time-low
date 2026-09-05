@@ -17,6 +17,12 @@ import type {
   SignalDirection,
   BinanceFundingRate,
   BinanceLongShortRatio,
+  PriceTargets,
+  PriceLevel,
+  ATHATLResult,
+  BollingerResult,
+  ATRResult,
+  EMAResult,
 } from "@/types/signal";
 
 function round(val: number): number {
@@ -371,6 +377,9 @@ export function computeSignals(
     agreementPct = Math.round((agreeCount / nonZeroGroups.length) * 100);
   }
 
+  const price = athAtlData.currentPrice;
+  const targets = computePriceTargets(price, score, bollinger, atr, ema, athAtlResult);
+
   return {
     momentum,
     trend,
@@ -384,5 +393,90 @@ export function computeSignals(
     direction,
     agreementPct,
     athAtl: athAtlResult,
+    priceTargets: targets,
+  };
+}
+
+function computePriceTargets(
+  price: number,
+  score: number,
+  bollinger: BollingerResult,
+  atr: ATRResult,
+  ema: EMAResult,
+  athAtl: ATHATLResult,
+): PriceTargets | undefined {
+  if (score === 0) return undefined;
+
+  const isLong = score > 0;
+  const absScore = Math.abs(score);
+
+  // ATR-based extensions
+  const atr1x = price + (isLong ? 1 : -1) * atr.value;
+  const atr15x = price + (isLong ? 1 : -1) * atr.value * 1.5;
+  const atr2x = price + (isLong ? 1 : -1) * atr.value * 2;
+
+  // Bollinger levels
+  const bbTarget = isLong ? bollinger.upper : bollinger.lower;
+  const bbStop = isLong ? bollinger.lower : bollinger.upper;
+
+  // EMA levels
+  const emaTarget = isLong ? Math.max(ema.fast, ema.slow) : Math.min(ema.fast, ema.slow);
+
+  // ATH/ATL extremes
+  const athTarget = athAtl.athPrice;
+  const atlTarget = athAtl.atlPrice;
+
+  // ── L1: Conservative (nearest sensible level) ──
+  let l1Price: number;
+  if (isLong) {
+    const bbMid = (price + bollinger.upper) / 2;
+    l1Price = Math.min(bbMid, atr1x);
+  } else {
+    const bbMid = (price + bollinger.lower) / 2;
+    l1Price = Math.max(bbMid, atr1x);
+  }
+  const l1 = makeLevel(price, l1Price, "BB Mid / ATR 1x");
+
+  // ── L2: Moderate (ATR extension + EMA confirmation) ──
+  let l2Price: number;
+  if (isLong) {
+    l2Price = Math.min(atr15x, Math.max(atr15x, emaTarget));
+  } else {
+    l2Price = Math.max(atr15x, Math.min(atr15x, emaTarget));
+  }
+  const l2 = makeLevel(price, l2Price, "ATR 1.5x");
+
+  // ── L3: Aggressive (ATH/ATL or ATR 2x) ──
+  let l3Price: number;
+  let l3Src: string;
+  if (isLong) {
+    l3Price = Math.min(atr2x, athTarget);
+    l3Src = athTarget <= atr2x ? "ATH" : "ATR 2x";
+  } else {
+    l3Price = Math.max(atr2x, atlTarget);
+    l3Src = atlTarget >= atr2x ? "ATL" : "ATR 2x";
+  }
+  const l3 = makeLevel(price, l3Price, l3Src);
+
+  // ── Invalidation: Bollinger opposite band or 0.5x ATR beyond stop ──
+  const stopFromBB = bbStop;
+  const stopFromATR = price + (isLong ? -1 : 1) * atr.value * 0.5;
+  const invalidation = isLong
+    ? Math.max(stopFromBB, stopFromATR)   // higher of the two for longs
+    : Math.min(stopFromBB, stopFromATR);   // lower of the two for shorts
+
+  return {
+    l1,
+    l2,
+    l3,
+    invalidation: round(invalidation),
+  };
+}
+
+function makeLevel(price: number, targetPrice: number, source: string): PriceLevel {
+  return {
+    price: targetPrice,
+    distance: round(((targetPrice - price) / price) * 100),
+    source,
   };
 }
