@@ -78,6 +78,25 @@ async function processCoinsWithSignals(
   return results;
 }
 
+function isRelevantCoin(coin: CoinMarket): boolean {
+  // Near ATH: within -15%
+  if (coin.ath_change_percentage >= -15 && coin.ath_change_percentage < 0) return true;
+
+  // Near ATL: within +15%
+  if (coin.atl_change_percentage <= 15 && coin.atl_change_percentage > 0) return true;
+
+  // Above ATH (new ATH)
+  if (coin.ath_change_percentage >= 0) return true;
+
+  // Big 24h move
+  if (Math.abs(coin.price_change_percentage_24h) > 5) return true;
+
+  // Deep drop from ATH (potential reversal zone)
+  if (coin.ath_change_percentage <= -70) return true;
+
+  return false;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const currency = searchParams.get("currency") || "usd";
@@ -101,14 +120,36 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const top50 = merged
-      .filter((c) => c.market_cap > 0)
-      .sort((a, b) => b.market_cap - a.market_cap)
-      .slice(0, 50);
+    // Filter for relevant coins (near ATH/ATL, big moves, deep drops)
+    const relevant = merged
+      .filter((c) => c.market_cap > 0 && isRelevantCoin(c))
+      .sort((a, b) => {
+        // Prioritize: near ATH > near ATL > big moves > deep drops
+        const aNearATH = a.ath_change_percentage >= -15 && a.ath_change_percentage < 0 ? 1 : 0;
+        const bNearATH = b.ath_change_percentage >= -15 && b.ath_change_percentage < 0 ? 1 : 0;
+        if (aNearATH !== bNearATH) return bNearATH - aNearATH;
 
-    const withSignals = await processCoinsWithSignals(top50);
+        const aAboveATH = a.ath_change_percentage >= 0 ? 1 : 0;
+        const bAboveATH = b.ath_change_percentage >= 0 ? 1 : 0;
+        if (aAboveATH !== bAboveATH) return bAboveATH - aAboveATH;
 
-    return NextResponse.json(withSignals);
+        const aNearATL = a.atl_change_percentage <= 15 && a.atl_change_percentage > 0 ? 1 : 0;
+        const bNearATL = b.atl_change_percentage <= 15 && b.atl_change_percentage > 0 ? 1 : 0;
+        if (aNearATL !== bNearATL) return bNearATL - aNearATL;
+
+        return Math.abs(b.price_change_percentage_24h) - Math.abs(a.price_change_percentage_24h);
+      });
+
+    const withSignals = await processCoinsWithSignals(relevant);
+
+    // Filter out "wait" signals - only show long/short
+    const actionable = withSignals.filter((c) => {
+      if (!c.signals) return false;
+      const dir = c.signals.direction;
+      return dir !== "wait";
+    });
+
+    return NextResponse.json(actionable);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
