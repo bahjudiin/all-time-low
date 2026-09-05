@@ -162,3 +162,26 @@ export async function fetchBybitData(symbol: string) {
     takerRatio: [] as BinanceLongShortRatio[],
   };
 }
+
+export async function fetchBybitMultiTimeframeData(symbol: string) {
+  const [klines15m, klines1h, klines4h, fundingRate, openInterest, longShort] = await Promise.all([
+    fetchBybitKlines(symbol, "15", 200),
+    fetchBybitKlines(symbol, "60", 500),
+    fetchBybitKlines(symbol, "240", 300),
+    fetchBybitFundingRate(symbol),
+    fetchBybitOpenInterest(symbol),
+    fetchBybitLongShortRatio(symbol),
+  ]);
+
+  return {
+    klines15m,
+    klines1h,
+    klines4h,
+    fundingRate,
+    openInterest,
+    globalRatio: longShort,
+    topRatio: [] as BinanceLongShortRatio[],
+    topPositionRatio: [] as BinanceLongShortRatio[],
+    takerRatio: [] as BinanceLongShortRatio[],
+  };
+}

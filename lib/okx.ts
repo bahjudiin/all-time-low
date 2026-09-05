@@ -154,6 +154,29 @@ export async function fetchOKXData(instId: string) {
   };
 }
 
+export async function fetchOKXMultiTimeframeData(instId: string) {
+  const [klines15m, klines1h, klines4h, fundingRate, openInterest, longShort] = await Promise.all([
+    fetchOKXKlines(instId, "15m", 200),
+    fetchOKXKlines(instId, "1H", 500),
+    fetchOKXKlines(instId, "4H", 300),
+    fetchOKXFundingRate(instId),
+    fetchOKXOpenInterest(instId),
+    fetchOKXLongShortRatio(instId),
+  ]);
+
+  return {
+    klines15m,
+    klines1h,
+    klines4h,
+    fundingRate,
+    openInterest,
+    globalRatio: longShort,
+    topRatio: [] as BinanceLongShortRatio[],
+    topPositionRatio: [] as BinanceLongShortRatio[],
+    takerRatio: [] as BinanceLongShortRatio[],
+  };
+}
+
 export type OKXLiquidationItem = {
   instId: string;
   instType: string;

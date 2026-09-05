@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchCoinsMarkets, fetchExtraBinanceCoins } from "@/lib/coingecko";
-import { COINGECKO_TO_BINANCE, fetchBinanceMultiTimeframeData } from "@/lib/binance";
+import { fetchMultiTimeframeExchangeData } from "@/lib/exchange";
 import { computeOvervaluedUndervalued, type OvervaluedUndervaluedResult } from "@/lib/overvaluedUndervalued";
 import type { CoinMarket } from "@/types/coin";
 
@@ -14,27 +14,11 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function tryDynamicSymbol(symbol: string): string | null {
-  const upper = symbol.toUpperCase();
-  if (upper.length >= 2 && upper.length <= 10) {
-    return `${upper}USDT`;
-  }
-  return null;
-}
-
-async function resolveFuturesSymbol(coingeckoId: string, symbol: string): Promise<string | null> {
-  const mapped = COINGECKO_TO_BINANCE[coingeckoId] || COINGECKO_TO_BINANCE[symbol];
-  if (mapped) return mapped;
-  return tryDynamicSymbol(symbol);
-}
-
 async function computeForCoin(
   coin: CoinMarket,
 ): Promise<OvervaluedUndervaluedResult | null> {
-  const symbol = await resolveFuturesSymbol(coin.id, coin.symbol.toLowerCase());
-  if (!symbol) return null;
   try {
-    const data = await fetchBinanceMultiTimeframeData(symbol);
+    const data = await fetchMultiTimeframeExchangeData(coin.id, coin.symbol.toLowerCase());
     if (!data || data.klines1h.length < 50) return null;
 
     const result = computeOvervaluedUndervalued({
