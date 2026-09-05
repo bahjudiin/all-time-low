@@ -28,61 +28,77 @@ function formatPrice(n: number): string {
   return `$${n.toFixed(6)}`;
 }
 
-function getStateColor(state: string): string {
-  switch (state) {
-    case "extreme":
-    case "exhaustion_building":
-      return "text-red-400";
-    case "target_forming":
-    case "limit_zone":
-      return "text-amber-400";
-    case "touched":
-    case "reversing":
-      return "text-purple-400";
-    case "extended":
-      return "text-orange-400";
-    case "accelerating":
-      return "text-yellow-400";
-    case "move_detected":
-      return "text-blue-400";
-    case "invalidated":
-      return "text-zinc-500";
-    default:
-      return "text-zinc-500";
-  }
+function ScoreBar({ value, max = 100, color }: { value: number; max?: number; color: string }) {
+  const pct = Math.min((Math.abs(value) / max) * 100, 100);
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="w-12 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-[10px] font-mono text-zinc-400 w-7 text-right">{Math.abs(value)}%</span>
+    </div>
+  );
 }
 
-function getQualityBadge(quality: string): { bg: string; text: string } {
-  switch (quality) {
-    case "A+":
-      return { bg: "bg-amber-500/20", text: "text-amber-400" };
-    case "A":
-      return { bg: "bg-green-500/20", text: "text-green-400" };
-    case "B":
-      return { bg: "bg-blue-500/20", text: "text-blue-400" };
-    case "C":
-      return { bg: "bg-zinc-500/20", text: "text-zinc-400" };
-    case "WATCH":
-      return { bg: "bg-zinc-500/10", text: "text-zinc-500" };
-    default:
-      return { bg: "bg-zinc-500/10", text: "text-zinc-500" };
-  }
+function DirectionBadge({ dir }: { dir: string }) {
+  return (
+    <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded ${
+      dir === "SHORT" ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"
+    }`}>
+      {dir}
+    </span>
+  );
 }
 
-function getApproachBadge(state: string): { bg: string; text: string } {
-  switch (state) {
-    case "TOUCHING":
-    case "TOUCHED":
-      return { bg: "bg-purple-500/20", text: "text-purple-400" };
-    case "NEAR":
-      return { bg: "bg-amber-500/20", text: "text-amber-400" };
-    case "APPROACHING":
-      return { bg: "bg-blue-500/20", text: "text-blue-400" };
-    case "REVERSING":
-      return { bg: "bg-green-500/20", text: "text-green-400" };
-    default:
-      return { bg: "bg-zinc-500/10", text: "text-zinc-500" };
-  }
+function QualityBadge({ quality }: { quality: string }) {
+  const colors: Record<string, string> = {
+    "A+": "bg-amber-500/20 text-amber-400",
+    A: "bg-green-500/20 text-green-400",
+    B: "bg-blue-500/20 text-blue-400",
+    C: "bg-zinc-500/20 text-zinc-400",
+    WATCH: "bg-zinc-500/10 text-zinc-500",
+  };
+  return (
+    <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded ${colors[quality] || colors.WATCH}`}>
+      {quality}
+    </span>
+  );
+}
+
+function StateBadge({ state }: { state: string }) {
+  const colors: Record<string, string> = {
+    extreme: "text-red-400",
+    exhaustion_building: "text-red-400",
+    target_forming: "text-amber-400",
+    limit_zone: "text-amber-400",
+    touched: "text-purple-400",
+    reversing: "text-purple-400",
+    extended: "text-orange-400",
+    accelerating: "text-yellow-400",
+    move_detected: "text-blue-400",
+    invalidated: "text-zinc-500",
+  };
+  return (
+    <span className={`text-[10px] font-medium uppercase ${colors[state] || "text-zinc-500"}`}>
+      {state.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+function ApproachBadge({ state }: { state: string }) {
+  const colors: Record<string, string> = {
+    TOUCHING: "bg-purple-500/20 text-purple-400",
+    TOUCHED: "bg-purple-500/20 text-purple-400",
+    NEAR: "bg-amber-500/20 text-amber-400",
+    APPROACHING: "bg-blue-500/20 text-blue-400",
+    REVERSING: "bg-green-500/20 text-green-400",
+    FAR: "bg-zinc-500/10 text-zinc-500",
+  };
+  return (
+    <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${colors[state] || colors.FAR}`}>
+      {state}
+    </span>
+  );
 }
 
 export function PredictionTable({
@@ -97,22 +113,15 @@ export function PredictionTable({
     () => [
       {
         accessorKey: "symbol",
-        header: "Symbol",
+        header: "Coin",
         cell: ({ row }) => {
           const p = row.original;
           return (
             <div className="flex items-center gap-2">
-              <img
-                src={p.image}
-                alt={p.name}
-                className="w-5 h-5 rounded-full"
-                loading="lazy"
-              />
+              <img src={p.image} alt={p.name} className="w-5 h-5 rounded-full" loading="lazy" />
               <div>
                 <div className="font-medium text-xs">{p.symbol}</div>
-                <div className="text-[10px] text-zinc-500 truncate max-w-[80px]">
-                  {p.name}
-                </div>
+                <div className="text-[10px] text-zinc-500 truncate max-w-[80px]">{p.name}</div>
               </div>
             </div>
           );
@@ -120,49 +129,47 @@ export function PredictionTable({
         size: 120,
       },
       {
+        accessorKey: "direction",
+        header: "Dir",
+        cell: ({ getValue }) => <DirectionBadge dir={getValue() as string} />,
+        size: 60,
+      },
+      {
+        accessorKey: "quality",
+        header: "Quality",
+        cell: ({ getValue }) => <QualityBadge quality={getValue() as string} />,
+        size: 60,
+      },
+      {
+        accessorKey: "state",
+        header: "State",
+        cell: ({ getValue }) => <StateBadge state={getValue() as string} />,
+        size: 110,
+      },
+      {
+        accessorKey: "currentPrice",
+        header: "Price",
+        cell: ({ getValue }) => (
+          <span className="text-xs font-mono text-foreground">{formatPrice(getValue() as number)}</span>
+        ),
+        size: 90,
+      },
+      {
         accessorKey: "movePercent",
         header: "Move",
         cell: ({ getValue }) => {
           const val = getValue() as number;
           return (
-            <span
-              className={`text-xs font-mono ${
-                val > 0 ? "text-green-400" : val < 0 ? "text-red-400" : "text-zinc-500"
-              }`}
-            >
-              {val > 0 ? "+" : ""}
-              {val.toFixed(1)}%
+            <span className={`text-xs font-mono ${val > 0 ? "text-green-400" : val < 0 ? "text-red-400" : "text-zinc-500"}`}>
+              {val > 0 ? "+" : ""}{val.toFixed(1)}%
             </span>
           );
         },
-        size: 70,
-      },
-      {
-        accessorKey: "state",
-        header: "State",
-        cell: ({ getValue }) => {
-          const val = getValue() as string;
-          return (
-            <span className={`text-[10px] font-medium uppercase ${getStateColor(val)}`}>
-              {val.replace(/_/g, " ")}
-            </span>
-          );
-        },
-        size: 110,
-      },
-      {
-        accessorKey: "currentPrice",
-        header: "Current",
-        cell: ({ getValue }) => (
-          <span className="text-xs font-mono text-foreground">
-            {formatPrice(getValue() as number)}
-          </span>
-        ),
-        size: 90,
+        size: 65,
       },
       {
         accessorKey: "predictedZone",
-        header: "Predicted Zone",
+        header: "Zone",
         cell: ({ getValue, row }) => {
           const zone = getValue() as CoinPrediction["predictedZone"];
           const dir = row.original.direction;
@@ -171,7 +178,7 @@ export function PredictionTable({
               <div className={dir === "SHORT" ? "text-red-400" : "text-green-400"}>
                 {formatPrice(zone.upper)}
               </div>
-              <div className="text-zinc-500">—</div>
+              <div className="text-zinc-600">↓</div>
               <div className={dir === "SHORT" ? "text-red-400" : "text-green-400"}>
                 {formatPrice(zone.lower)}
               </div>
@@ -182,7 +189,7 @@ export function PredictionTable({
       },
       {
         accessorKey: "distanceToZonePct",
-        header: "Distance",
+        header: "Dist",
         cell: ({ getValue }) => {
           const val = getValue() as number;
           return (
@@ -191,115 +198,86 @@ export function PredictionTable({
             </span>
           );
         },
-        size: 65,
+        size: 55,
       },
       {
         accessorKey: "approachState",
         header: "Approach",
-        cell: ({ getValue }) => {
-          const val = getValue() as string;
-          const badge = getApproachBadge(val);
-          return (
-            <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${badge.bg} ${badge.text}`}>
-              {val}
-            </span>
-          );
-        },
+        cell: ({ getValue }) => <ApproachBadge state={getValue() as string} />,
         size: 85,
       },
       {
-        accessorKey: "zoneReachProbability",
-        header: "Reach %",
-        cell: ({ getValue }) => {
-          const val = getValue() as number;
-          return (
-            <div className="flex items-center gap-1.5">
-              <div className="w-10 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded-full"
-                  style={{ width: `${val}%` }}
-                />
-              </div>
-              <span className="text-[10px] font-mono text-zinc-400">{val}%</span>
-            </div>
-          );
-        },
-        size: 80,
-      },
-      {
         accessorKey: "exhaustionProbability",
-        header: "Exhaust %",
+        header: "Exhaust",
         cell: ({ getValue }) => {
           const val = getValue() as number;
           return (
-            <div className="flex items-center gap-1.5">
-              <div className="w-10 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${val >= 70 ? "bg-red-500" : val >= 50 ? "bg-amber-500" : "bg-zinc-600"}`}
-                  style={{ width: `${val}%` }}
-                />
-              </div>
-              <span className={`text-[10px] font-mono ${val >= 70 ? "text-red-400" : val >= 50 ? "text-amber-400" : "text-zinc-400"}`}>
-                {val}%
-              </span>
-            </div>
+            <ScoreBar
+              value={val}
+              color={val >= 70 ? "bg-red-500" : val >= 50 ? "bg-amber-500" : "bg-zinc-600"}
+            />
           );
         },
         size: 90,
       },
       {
         accessorKey: "continuationProbability",
-        header: "Cont %",
+        header: "Cont",
         cell: ({ getValue }) => {
           const val = getValue() as number;
-          return (
-            <span className={`text-[10px] font-mono ${val < 30 ? "text-green-400" : "text-zinc-400"}`}>
-              {val}%
-            </span>
-          );
+          return <ScoreBar value={val} color={val < 30 ? "bg-green-500" : "bg-zinc-600"} />;
         },
-        size: 55,
+        size: 90,
       },
       {
-        accessorKey: "quality",
-        header: "Quality",
+        accessorKey: "zoneReachProbability",
+        header: "Reach",
         cell: ({ getValue }) => {
-          const val = getValue() as string;
-          const badge = getQualityBadge(val);
-          return (
-            <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded ${badge.bg} ${badge.text}`}>
-              {val}
-            </span>
-          );
+          const val = getValue() as number;
+          return <ScoreBar value={val} color="bg-blue-500" />;
         },
-        size: 55,
+        size: 90,
       },
       {
-        accessorKey: "direction",
-        header: "Dir",
-        cell: ({ getValue }) => {
-          const val = getValue() as string;
+        accessorKey: "agreeingClusters",
+        header: "Clust",
+        cell: ({ getValue, row }) => {
+          const agree = getValue() as number;
+          const conflict = row.original.conflictingClusters;
           return (
-            <span
-              className={`text-[10px] font-bold ${
-                val === "SHORT" ? "text-red-400" : "text-green-400"
-              }`}
-            >
-              {val}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className={`text-[10px] font-mono ${agree >= 4 ? "text-green-400" : agree >= 2 ? "text-amber-400" : "text-zinc-500"}`}>
+                {agree}
+              </span>
+              <span className="text-[10px] text-zinc-600">/</span>
+              <span className={`text-[10px] font-mono ${conflict > 0 ? "text-red-400" : "text-zinc-500"}`}>
+                {conflict}
+              </span>
+            </div>
           );
         },
         size: 50,
       },
       {
+        accessorKey: "factors",
+        header: "RSI",
+        cell: ({ getValue }) => {
+          const f = (getValue() as CoinPrediction["factors"]).momentum;
+          return (
+            <span className={`text-[10px] font-mono ${f.rsi > 70 ? "text-red-400" : f.rsi < 30 ? "text-green-400" : "text-zinc-400"}`}>
+              {f.rsi.toFixed(0)}
+            </span>
+          );
+        },
+        size: 45,
+      },
+      {
         accessorKey: "invalidation",
-        header: "Invalidation",
+        header: "Inval",
         cell: ({ getValue }) => (
-          <span className="text-[10px] font-mono text-zinc-500">
-            {formatPrice(getValue() as number)}
-          </span>
+          <span className="text-[10px] font-mono text-zinc-500">{formatPrice(getValue() as number)}</span>
         ),
-        size: 90,
+        size: 80,
       },
     ],
     []
@@ -324,24 +302,16 @@ export function PredictionTable({
                 return (
                   <th
                     key={header.id}
-                    className="px-3 py-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors select-none"
+                    className="px-2 py-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors select-none"
                     style={{ width: header.getSize() }}
                     onClick={() =>
-                      onSort(
-                        sortKey,
-                        isSorted && sortDirection === "desc" ? "asc" : "desc"
-                      )
+                      onSort(sortKey, isSorted && sortDirection === "desc" ? "asc" : "desc")
                     }
                   >
                     <div className="flex items-center gap-1">
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
+                      {flexRender(header.column.columnDef.header, header.getContext())}
                       {isSorted && (
-                        <span className="text-blue-500">
-                          {sortDirection === "asc" ? "↑" : "↓"}
-                        </span>
+                        <span className="text-blue-500">{sortDirection === "asc" ? "↑" : "↓"}</span>
                       )}
                     </div>
                   </th>
@@ -367,7 +337,7 @@ export function PredictionTable({
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className="px-3 py-2 whitespace-nowrap"
+                    className="px-2 py-2 whitespace-nowrap"
                     style={{ width: cell.column.getSize() }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

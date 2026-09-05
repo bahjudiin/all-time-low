@@ -226,7 +226,12 @@ export type PredictionSortColumn =
   | "zoneReachProbability"
   | "exhaustionProbability"
   | "continuationProbability"
-  | "quality";
+  | "quality"
+  | "agreeingClusters"
+  | "volatility"
+  | "rsi"
+  | "volumeZScore"
+  | "approachState";
 
 export interface PredictionFilters {
   direction: "all" | "LONG" | "SHORT";
@@ -244,11 +249,13 @@ export interface PredictionStoreState {
   history: PredictionRecord[];
   isScanning: boolean;
   lastScanTime: number;
+  viewMode: "table" | "cards";
   setPredictions: (predictions: CoinPrediction[]) => void;
   updatePrediction: (symbol: string, update: Partial<CoinPrediction>) => void;
   setSelectedSymbol: (symbol: string | null) => void;
   setFilters: (filters: Partial<PredictionFilters>) => void;
   setSort: (column: PredictionSortColumn, direction: "asc" | "desc") => void;
+  setViewMode: (mode: "table" | "cards") => void;
   addHistoryRecord: (record: PredictionRecord) => void;
   setScanning: (scanning: boolean) => void;
 }

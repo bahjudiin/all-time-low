@@ -23,6 +23,7 @@ export const usePredictionStore = create<PredictionStoreState>((set) => ({
   history: [],
   isScanning: false,
   lastScanTime: 0,
+  viewMode: "table",
 
   setPredictions: (predictions: CoinPrediction[]) =>
     set({ predictions, lastScanTime: Date.now() }),
@@ -44,6 +45,9 @@ export const usePredictionStore = create<PredictionStoreState>((set) => ({
 
   setSort: (column: PredictionSortColumn, direction: "asc" | "desc") =>
     set({ sortColumn: column, sortDirection: direction }),
+
+  setViewMode: (mode: "table" | "cards") =>
+    set({ viewMode: mode }),
 
   addHistoryRecord: (record: PredictionRecord) =>
     set((state) => ({

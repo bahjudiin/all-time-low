@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchCoinsMarkets, fetchExtraBinanceCoins } from "@/lib/coingecko";
 import { fetchExchangeData } from "@/lib/exchange";
 import { computePrediction } from "@/lib/prediction";
 import type { CoinMarket } from "@/types/coin";
@@ -9,9 +8,64 @@ export const revalidate = 60;
 
 const MAX_CONCURRENT = 5;
 const DELAY_MS = 150;
+const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
+const TIMEOUT_MS = 15000;
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchLowCapCoins(): Promise<CoinMarket[]> {
+  const allCoins: CoinMarket[] = [];
+  const seen = new Set<string>();
+
+  for (let page = 3; page <= 20; page++) {
+    const params = new URLSearchParams({
+      vs_currency: "usd",
+      order: "market_cap_desc",
+      per_page: "250",
+      page: String(page),
+      sparkline: "true",
+      price_change_percentage: "24h,7d,30d",
+    });
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const res = await fetch(`${COINGECKO_BASE}/coins/markets?${params}`, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+        next: { revalidate: 120 },
+      });
+
+      if (!res.ok) break;
+
+      const coins: CoinMarket[] = await res.json();
+      if (coins.length === 0) break;
+
+      for (const coin of coins) {
+        if (seen.has(coin.id)) continue;
+        seen.add(coin.id);
+
+        if (
+          coin.market_cap > 0 &&
+          coin.market_cap < 200_000_000 &&
+          coin.total_volume > 5_000_000
+        ) {
+          allCoins.push(coin);
+        }
+      }
+    } catch {
+      break;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    await sleep(300);
+  }
+
+  return allCoins.sort((a, b) => b.total_volume - a.total_volume);
 }
 
 async function processPredictions(
@@ -57,7 +111,6 @@ async function processPredictions(
     }
   }
 
-  // Sort by exhaustion probability descending
   results.sort((a, b) => b.exhaustionProbability - a.exhaustionProbability);
 
   return results;
@@ -68,30 +121,8 @@ export async function GET(request: NextRequest) {
   const currency = searchParams.get("currency") || "usd";
 
   try {
-    const [mainCoins, extraCoins] = await Promise.allSettled([
-      fetchCoinsMarkets(currency, 250, 1),
-      fetchExtraBinanceCoins(currency),
-    ]);
-
-    const allMain = mainCoins.status === "fulfilled" ? mainCoins.value : [];
-    const allExtra = extraCoins.status === "fulfilled" ? extraCoins.value : [];
-
-    const seen = new Set<string>();
-    const merged: CoinMarket[] = [];
-
-    for (const coin of [...allMain, ...allExtra]) {
-      if (!seen.has(coin.id)) {
-        seen.add(coin.id);
-        merged.push(coin);
-      }
-    }
-
-    const top50 = merged
-      .filter((c) => c.market_cap > 0 && c.total_volume > 1_000_000)
-      .sort((a, b) => b.market_cap - a.market_cap)
-      .slice(0, 50);
-
-    const predictions = await processPredictions(top50);
+    const lowCapCoins = await fetchLowCapCoins();
+    const predictions = await processPredictions(lowCapCoins);
 
     return NextResponse.json(predictions);
   } catch (error) {
