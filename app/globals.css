@@ -23,12 +23,13 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -36,19 +37,53 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #525252;
-  border-radius: 3px;
+  background: #3f3f46;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #737373;
+  background: #52525b;
+}
+
+/* Horizontal scroll */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.scroll-x::-webkit-scrollbar {
+  height: 3px;
+}
+
+/* Smooth scrolling */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Touch-friendly targets */
+@media (max-width: 768px) {
+  button, a, [role="button"] {
+    min-height: 36px;
+    min-width: 36px;
+  }
+
+  table td, table th {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .grid-card {
+    padding: 12px;
+  }
 }
 
 /* Range input styling */
 input[type="range"] {
   height: 4px;
   border-radius: 2px;
-  background: #525252;
+  background: #3f3f46;
   outline: none;
 }
 
@@ -59,4 +94,35 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 50%;
   background: #3b82f6;
   cursor: pointer;
+}
+
+/* Focus visible for accessibility */
+:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+/* Animate in */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Pulse for live indicators */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
 }

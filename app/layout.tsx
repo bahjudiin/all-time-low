@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,9 +13,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ATH/ATL Tracker — Crypto Screener",
-  description:
-    "Real-time All-Time High and All-Time Low tracker for the top 500 cryptocurrencies.",
+  title: "ATH/ATL Tracker",
+  description: "Real-time crypto ATH/ATL tracker with predictive signals",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ATH Tracker",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#3b82f6",
 };
 
 export default function RootLayout({
@@ -28,7 +41,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <head>
+        <link rel="apple-touch-icon" href="/icon.svg" />
+      </head>
+      <body className="min-h-full flex flex-col bg-background text-foreground overscroll-none">
         {children}
       </body>
     </html>

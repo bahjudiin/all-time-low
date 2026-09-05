@@ -136,7 +136,11 @@ export async function GET(request: NextRequest) {
 
     const predictions = await processPredictions(lowCapCoins);
 
-    return NextResponse.json(predictions);
+    return NextResponse.json(predictions, {
+      headers: {
+        "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300",
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
