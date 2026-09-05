@@ -18,8 +18,18 @@ function hasEnoughData(data: ExchangeData): boolean {
   return data.klines.length >= 30;
 }
 
+// Try to resolve symbol dynamically: SYMBOL + USDT
+function tryDynamicSymbol(symbol: string): string | null {
+  const upper = symbol.toUpperCase();
+  if (upper.length >= 2 && upper.length <= 10) {
+    return `${upper}USDT`;
+  }
+  return null;
+}
+
 async function tryBinance(coingeckoId: string, symbol: string): Promise<ExchangeData | null> {
-  const binanceSymbol = COINGECKO_TO_BINANCE[coingeckoId] || COINGECKO_TO_BINANCE[symbol];
+  // Try hardcoded mapping first, then dynamic
+  const binanceSymbol = COINGECKO_TO_BINANCE[coingeckoId] || COINGECKO_TO_BINANCE[symbol] || tryDynamicSymbol(symbol);
   if (!binanceSymbol) return null;
   try {
     const data = await fetchBinanceData(binanceSymbol);
@@ -31,7 +41,7 @@ async function tryBinance(coingeckoId: string, symbol: string): Promise<Exchange
 }
 
 async function tryOKX(coingeckoId: string, symbol: string): Promise<ExchangeData | null> {
-  const okxSymbol = COINGECKO_TO_OKX[coingeckoId] || COINGECKO_TO_OKX[symbol];
+  const okxSymbol = COINGECKO_TO_OKX[coingeckoId] || COINGECKO_TO_OKX[symbol] || `${symbol.toUpperCase()}-USDT`;
   if (!okxSymbol) return null;
   try {
     const data = await fetchOKXData(okxSymbol);
@@ -43,7 +53,7 @@ async function tryOKX(coingeckoId: string, symbol: string): Promise<ExchangeData
 }
 
 async function tryBybit(coingeckoId: string, symbol: string): Promise<ExchangeData | null> {
-  const bybitSymbol = COINGECKO_TO_BYBIT[coingeckoId] || COINGECKO_TO_BYBIT[symbol];
+  const bybitSymbol = COINGECKO_TO_BYBIT[coingeckoId] || COINGECKO_TO_BYBIT[symbol] || `${symbol.toUpperCase()}USDT`;
   if (!bybitSymbol) return null;
   try {
     const data = await fetchBybitData(bybitSymbol);
