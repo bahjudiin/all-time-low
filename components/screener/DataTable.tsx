@@ -188,9 +188,10 @@ const columns = [
 
 interface DataTableProps {
   data: CoinWithDerived[];
+  onRowClick?: (coin: CoinWithDerived) => void;
 }
 
-export function DataTable({ data }: DataTableProps) {
+export function DataTable({ data, onRowClick }: DataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: "market_cap", desc: true },
   ]);
@@ -255,7 +256,12 @@ export function DataTable({ data }: DataTableProps) {
             {rows.map((row) => (
               <tr
                 key={row.id}
-                className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
+                onClick={() => onRowClick?.(row.original)}
+                className={`transition-colors ${
+                  onRowClick
+                    ? "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
+                    : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
+                }`}
               >
                 {row.getVisibleCells().map((cell) => (
                   <td

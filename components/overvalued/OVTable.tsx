@@ -6,11 +6,12 @@ import type { OvervaluedUndervaluedResult } from "@/lib/overvaluedUndervalued";
 
 interface OVTableProps {
   results: OvervaluedUndervaluedResult[];
+  onRowClick?: (result: OvervaluedUndervaluedResult) => void;
 }
 
 type SortKey = "opportunityScore" | "overvaluationScore" | "undervaluationScore" | "reversalProbability" | "continuationProbability" | "finalConfidence" | "currentPrice" | "predictedEntry" | "distanceToEntryPct" | "expectedRewardRisk" | "dataQuality" | "priceChange24hPct";
 
-export function OVTable({ results }: OVTableProps) {
+export function OVTable({ results, onRowClick }: OVTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("opportunityScore");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -65,7 +66,7 @@ export function OVTable({ results }: OVTableProps) {
         </thead>
         <tbody>
           {sorted.map((r) => (
-            <tr key={r.symbol} className="border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+            <tr key={r.symbol} onClick={() => onRowClick?.(r)} className={`border-b border-zinc-100 dark:border-zinc-800/50 transition-colors ${onRowClick ? "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/30" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30"}`}>
               <td className="px-3 py-2 whitespace-nowrap">
                 <div className="flex items-center gap-2">
                   <img src={r.image} alt="" className="w-5 h-5 rounded-full" loading="lazy" />

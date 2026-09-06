@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { OvervaluedUndervaluedResult } from "@/lib/overvaluedUndervalued";
 import { OVCard } from "./OVCard";
 import { OVTable } from "./OVTable";
@@ -12,7 +12,13 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 type FilterKey = "all" | "overvalued" | "undervalued" | "extreme" | "entry-near" | "high-conf";
 
-export function OvervaluedUndervaluedClient() {
+export function OvervaluedUndervaluedClient({
+  onSelect,
+  controlledFilter,
+}: {
+  onSelect?: (symbol: string, result: OvervaluedUndervaluedResult) => void;
+  controlledFilter?: FilterKey;
+}) {
   const { data: results, isLoading } = useSWR<OvervaluedUndervaluedResult[]>(
     "/api/overvalued-undervalued",
     fetcher,
@@ -20,10 +26,14 @@ export function OvervaluedUndervaluedClient() {
   );
 
   const [viewMode, setViewMode] = useState<"cards" | "table">("table");
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [filter, setFilter] = useState<FilterKey>(controlledFilter ?? "all");
   const [search, setSearch] = useState("");
   const [minValuation, setMinValuation] = useState(0);
   const [minReversal, setMinReversal] = useState(0);
+
+  useEffect(() => {
+    if (controlledFilter) setFilter(controlledFilter);
+  }, [controlledFilter]);
 
   const filtered = useMemo(() => {
     if (!results) return [];
@@ -199,7 +209,7 @@ export function OvervaluedUndervaluedClient() {
         )}
 
         {!isLoading && filtered.length > 0 && viewMode === "table" && (
-          <OVTable results={filtered} />
+          <OVTable results={filtered} onRowClick={(r) => onSelect?.(r.symbol, r)} />
         )}
 
         {!isLoading && filtered.length > 0 && viewMode === "cards" && (
