@@ -76,7 +76,7 @@ export function SignalsListView() {
         {!isLoading && filtered.length === 0 && <p className="text-xs text-zinc-500 text-center py-16">No signals available</p>}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {filtered.map((coin) => (
-            <div key={coin.id} onClick={() => openModal(coin.id)} className="cursor-pointer">
+            <div key={coin.id} onClick={() => openModal(coin.symbol)} className="cursor-pointer">
               <SignalCardDetailed coin={coin as CoinWithDerived} signals={coin.signals!} />
             </div>
           ))}

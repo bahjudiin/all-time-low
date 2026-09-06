@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchCoinsMarkets, fetchExtraBinanceCoins } from "@/lib/coingecko";
 import { fetchExchangeData } from "@/lib/exchange";
 import { computeSignals } from "@/lib/signals";
+import { cachedGet } from "@/lib/cache";
 import type { CoinMarket } from "@/types/coin";
 import type { CoinSignals } from "@/types/signal";
 
 export const revalidate = 60;
 
-const MAX_CONCURRENT = 5;
-const DELAY_MS = 150;
+const MAX_CONCURRENT = 12;
+const DELAY_MS = 50;
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -101,11 +102,12 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const currency = searchParams.get("currency") || "usd";
 
-  try {
-    const [mainCoins, extraCoins] = await Promise.allSettled([
-      fetchCoinsMarkets(currency, 250, 1),
-      fetchExtraBinanceCoins(currency),
-    ]);
+  return cachedGet(`signals:${currency}`, 20_000, async () => {
+    try {
+      const [mainCoins, extraCoins] = await Promise.allSettled([
+        fetchCoinsMarkets(currency, 250, 1),
+        fetchExtraBinanceCoins(currency),
+      ]);
 
     const allMain = mainCoins.status === "fulfilled" ? mainCoins.value : [];
     const allExtra = extraCoins.status === "fulfilled" ? extraCoins.value : [];
@@ -161,4 +163,5 @@ export async function GET(request: NextRequest) {
       { status: 502 }
     );
   }
+  });
 }

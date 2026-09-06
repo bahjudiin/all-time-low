@@ -1,3 +1,5 @@
+import type { OvervaluedUndervaluedResult } from "@/lib/overvaluedUndervalued";
+
 export type NavTabId =
   | "ath-atl"
   | "pump-dump"
@@ -5,7 +7,6 @@ export type NavTabId =
   | "liquidations"
   | "settings";
 
-// Sub-tabs within each primary nav tab
 export type AthAtlSubTab = "near-ath" | "near-atl" | "signals";
 export type PumpDumpSubTab = "pump" | "pump-from-ath" | "dump" | "dump-from-atl";
 export type OverUnderSubTab = "overvalued" | "undervalued" | "extreme" | "entry-near" | "high-conf" | "signals";
@@ -72,14 +73,7 @@ export interface LiqSignal {
 
 // Extra data shown inside the coin detail modal (optional per tab)
 export interface CoinDetailExtra {
-  overvalued?: {
-    direction: string;
-    opportunityScore: number;
-    predictedEntry: number;
-    reversalProbability: number;
-    finalConfidence: number;
-    expectedRewardRisk: number;
-  };
+  overvalued?: OvervaluedUndervaluedResult;
   signals?: unknown;
   liq?: LiqSignal;
 }

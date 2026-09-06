@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { fetchLiquidationEvents } from "@/lib/liquidationHistory";
 import type { LiquidationEvent } from "@/types/liquidation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const rawSymbol = request.nextUrl.searchParams.get("symbol") ?? "";
+  const symbol = rawSymbol.toUpperCase();
+
   let events: LiquidationEvent[] = [];
   try {
     events = await fetchLiquidationEvents();
@@ -13,13 +16,17 @@ export async function GET() {
     // Serve whatever we have (possibly empty) rather than failing the whole tab.
   }
 
+  const filtered = symbol ? events.filter((e) => e.symbol === symbol) : events;
+
   return NextResponse.json(
     {
-      events,
+      events: filtered,
       meta: {
-        count: events.length,
+        count: filtered.length,
+        total: events.length,
+        symbol: symbol || null,
         provider: "okx",
-        note: "Filled liquidation history from OKX (public REST).",
+        lookupWindowHours: 24,
         queriedAt: new Date().toISOString(),
       },
     },

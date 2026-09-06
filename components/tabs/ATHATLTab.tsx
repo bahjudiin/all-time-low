@@ -36,16 +36,22 @@ export function ATHATLTab({ initialCoins }: { initialCoins: CoinMarket[] }) {
     const totalMarketCap = coins.reduce((s, c) => s + c.market_cap, 0);
     const avgATHDistance = coins.reduce((s, c) => s + c.ath_change_percentage, 0) / coins.length;
     const avgATLDistance = coins.reduce((s, c) => s + c.atl_change_percentage, 0) / coins.length;
+    const avg24h = coins.reduce((s, c) => s + c.price_change_percentage_24h, 0) / coins.length;
     const aboveATH = coins.filter((c) => c.ath_change_percentage >= 0).length;
+    const nearATH5 = coins.filter((c) => c.ath_change_percentage >= -5 && c.ath_change_percentage < 0).length;
+    const nearATL5 = coins.filter((c) => c.atl_change_percentage <= 5 && c.atl_change_percentage > 0).length;
     const deepestDrop = [...coins].sort((a, b) => a.ath_change_percentage - b.ath_change_percentage)[0];
     return [
-      { label: "MCap", value: formatCompact(totalMarketCap) },
-      { label: "AVG ATH", value: `${avgATHDistance.toFixed(1)}%`, color: avgATHDistance >= -30 ? "text-amber-400" : "text-red-400" },
-      { label: "AVG ATL", value: `+${avgATLDistance.toFixed(1)}%`, color: "text-green-400" },
-      { label: "Above ATH", value: String(aboveATH), color: "text-green-400" },
-      { label: "Near ATH", value: String(nearATH.length), color: "text-amber-400" },
-      { label: "Near ATL", value: String(nearATL.length), color: "text-blue-400" },
-      { label: "Deepest Drop", value: deepestDrop ? `${deepestDrop.symbol.toUpperCase()} ${deepestDrop.ath_change_percentage.toFixed(1)}%` : "—", color: "text-red-400" },
+      { label: "MCap", value: formatCompact(totalMarketCap), tooltip: "Total market cap of tracked coins" },
+      { label: "24h AVG", value: `${avg24h >= 0 ? "+" : ""}${avg24h.toFixed(2)}%`, color: avg24h >= 0 ? "text-emerald-400" : "text-red-400", tooltip: "Average 24h price change" },
+      { label: "AVG ATH", value: `${avgATHDistance.toFixed(1)}%`, color: avgATHDistance >= -30 ? "text-amber-400" : "text-red-400", tooltip: "Average distance from each coin's all-time high" },
+      { label: "AVG ATL", value: `+${avgATLDistance.toFixed(1)}%`, color: "text-green-400", tooltip: "Average distance above each coin's all-time low" },
+      { label: "Above ATH", value: String(aboveATH), color: "text-green-400", tooltip: "Coins trading at or above their all-time high" },
+      { label: "Near ATH", value: String(nearATH.length), color: "text-amber-400", tooltip: "Coins within 15% below their all-time high" },
+      { label: "ATH <5%", value: String(nearATH5), color: "text-amber-300", tooltip: "Coins within 5% of their all-time high (leading)" },
+      { label: "Near ATL", value: String(nearATL.length), color: "text-blue-400", tooltip: "Coins within 15% above their all-time low" },
+      { label: "ATL <5%", value: String(nearATL5), color: "text-blue-300", tooltip: "Coins within 5% of their all-time low (leading)" },
+      { label: "Deepest Drop", value: deepestDrop ? `${deepestDrop.symbol.toUpperCase()} ${deepestDrop.ath_change_percentage.toFixed(1)}%` : "—", color: "text-red-400", tooltip: "Farthest below all-time high" },
     ];
   }, [coins, nearATH, nearATL]);
 

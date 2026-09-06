@@ -22,16 +22,7 @@ export function OverUnderTab() {
   };
 
   const handleSelect = (symbol: string, result: OvervaluedUndervaluedResult) => {
-    openModalWithExtra(symbol, {
-      overvalued: {
-        direction: result.direction,
-        opportunityScore: result.opportunityScore,
-        predictedEntry: result.predictedEntry,
-        reversalProbability: result.reversalProbability,
-        finalConfidence: result.finalConfidence,
-        expectedRewardRisk: result.expectedRewardRisk,
-      },
-    });
+    openModalWithExtra(symbol, { overvalued: result });
   };
 
   return (

@@ -345,7 +345,7 @@ export function computeSignals(
     athAtlData.atlDate,
   );
 
-  let athAtlSignal: -1 | 0 | 1 = athAtlResult.signal;
+  const athAtlSignal: -1 | 0 | 1 = athAtlResult.signal;
   const athAtlGroup = buildGroup(
     "ATH/ATL Position",
     athAtlSignal,

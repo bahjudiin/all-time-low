@@ -37,15 +37,23 @@ export function PumpDumpTab({ initialCoins }: { initialCoins: CoinMarket[] }) {
     const avgChange = coins.reduce((s, c) => s + c.price_change_percentage_24h, 0) / coins.length;
     const pumps = coins.filter((c) => c.price_change_percentage_24h > 10);
     const dumps = coins.filter((c) => c.price_change_percentage_24h < -10);
+    const pumps5 = coins.filter((c) => c.price_change_percentage_24h >= 5).length;
+    const dumps5 = coins.filter((c) => c.price_change_percentage_24h <= -5).length;
+    const avgMCap = coins.reduce((s, c) => s + c.market_cap, 0) / coins.length;
     const top = strongestPump[0];
     const bot = strongestDump[0];
     return [
-      { label: "AVG 24h", value: `${avgChange >= 0 ? "+" : ""}${avgChange.toFixed(2)}%`, color: avgChange >= 0 ? "text-green-400" : "text-red-400" },
-      { label: "Pumps >10%", value: String(pumps.length), color: "text-green-400" },
-      { label: "Dumps <10%", value: String(dumps.length), color: "text-red-400" },
-      { label: "Top", value: top ? `${top.symbol.toUpperCase()} +${top.price_change_percentage_24h.toFixed(1)}%` : "—", color: "text-green-400" },
-      { label: "Bot", value: bot ? `${bot.symbol.toUpperCase()} ${bot.price_change_percentage_24h.toFixed(1)}%` : "—", color: "text-red-400" },
-      { label: "Vol", value: formatCompact(coins.reduce((s, c) => s + c.total_volume, 0)) },
+      { label: "AVG 24h", value: `${avgChange >= 0 ? "+" : ""}${avgChange.toFixed(2)}%`, color: avgChange >= 0 ? "text-green-400" : "text-red-400", tooltip: "Average 24h price change across tracked coins" },
+      { label: "Advancers", value: String(coins.filter((c) => c.price_change_percentage_24h > 0).length), color: "text-emerald-400", tooltip: "Coins up on the session" },
+      { label: "Decliners", value: String(coins.filter((c) => c.price_change_percentage_24h < 0).length), color: "text-red-400", tooltip: "Coins down on the session" },
+      { label: "+5%", value: String(pumps5), color: "text-emerald-400", tooltip: "Coins up more than 5% (leading)" },
+      { label: "−5%", value: String(dumps5), color: "text-red-400", tooltip: "Coins down more than 5% (leading)" },
+      { label: "Pumps >10%", value: String(pumps.length), color: "text-green-400", tooltip: "Coins up more than 10% in 24h" },
+      { label: "Dumps <10%", value: String(dumps.length), color: "text-red-400", tooltip: "Coins down more than 10% in 24h" },
+      { label: "Top", value: top ? `${top.symbol.toUpperCase()} +${top.price_change_percentage_24h.toFixed(1)}%` : "—", color: "text-green-400", tooltip: "Biggest 24h gainer" },
+      { label: "Bot", value: bot ? `${bot.symbol.toUpperCase()} ${bot.price_change_percentage_24h.toFixed(1)}%` : "—", color: "text-red-400", tooltip: "Biggest 24h loser" },
+      { label: "AVG MCap", value: formatCompact(avgMCap), tooltip: "Average market cap" },
+      { label: "Vol", value: formatCompact(coins.reduce((s, c) => s + c.total_volume, 0)), tooltip: "Combined 24h trading volume" },
     ];
   }, [coins, strongestPump, strongestDump]);
 

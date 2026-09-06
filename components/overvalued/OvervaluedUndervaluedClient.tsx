@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import type { OvervaluedUndervaluedResult } from "@/lib/overvaluedUndervalued";
 import { OVCard } from "./OVCard";
 import { OVTable } from "./OVTable";
@@ -31,9 +31,11 @@ export function OvervaluedUndervaluedClient({
   const [minValuation, setMinValuation] = useState(0);
   const [minReversal, setMinReversal] = useState(0);
 
-  useEffect(() => {
+  const [lastControlled, setLastControlled] = useState(controlledFilter);
+  if (controlledFilter !== lastControlled) {
+    setLastControlled(controlledFilter);
     if (controlledFilter) setFilter(controlledFilter);
-  }, [controlledFilter]);
+  }
 
   const filtered = useMemo(() => {
     if (!results) return [];
