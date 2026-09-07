@@ -53,8 +53,18 @@ const OKX_CONTRACT_MULTIPLIER: Record<string, number> = {
   PEPE: 1000000,
 };
 
+let idCounter = 0;
+let idCounterTs = 0;
+
 function generateId(exchange: string, ts: number, symbol: string): string {
-  return `${exchange}-${ts}-${symbol}-${Math.random().toString(36).slice(2, 8)}`;
+  const now = Date.now();
+  if (now !== idCounterTs) {
+    idCounterTs = now;
+    idCounter = 0;
+  }
+  const seq = ++idCounter;
+  const rnd = Math.random().toString(36).slice(2, 8);
+  return `${exchange}-${ts}-${symbol}-${now.toString(36)}-${seq.toString(36)}-${rnd}`;
 }
 
 export function deriveSymbolFromBinance(nativeSymbol: string): string {
@@ -68,9 +78,18 @@ export function deriveSymbolFromOKX(instId: string): string {
   return parts[0];
 }
 
+const warnedMultiplierSymbols = new Set<string>();
+
 export function estimateUsdValue(price: number, qty: number, symbol: string): number {
   const multiplier = OKX_CONTRACT_MULTIPLIER[symbol];
   if (multiplier) return price * qty * multiplier;
+  if (!warnedMultiplierSymbols.has(symbol)) {
+    warnedMultiplierSymbols.add(symbol);
+    console.warn(
+      `[normalize] estimateUsdValue: no OKX contract multiplier for "${symbol}", ` +
+        "using price*qty; value may be off (contract size can vary 10x-1000x)."
+    );
+  }
   return price * qty;
 }
 
@@ -102,7 +121,7 @@ export function normalizeOKXLiq(raw: OKXLiquidationOrder): LiquidationEvent {
   const side = raw.side === "sell" ? "long" : "short";
   const price = parseFloat(raw.bkPx);
   const qty = parseFloat(raw.bz);
-  const ts = parseInt(raw.ts);
+  const ts = parseInt(raw.ts, 10);
   const usdValue = estimateUsdValue(price, qty, symbol);
 
   return {

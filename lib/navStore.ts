@@ -17,9 +17,9 @@ interface NavState {
   liquidationSubTab: LiquidationSubTab;
   liqTimeframe: LiqTimeframe;
   liqMinPct: number;
-  // symbol of the coin for the more-info modal
   modalSymbol: string | null;
   modalExtra: CoinDetailExtra | null;
+  feedOpen: boolean;
 }
 
 interface NavActions {
@@ -33,6 +33,7 @@ interface NavActions {
   openModal: (symbol: string) => void;
   openModalWithExtra: (symbol: string, extra: CoinDetailExtra) => void;
   closeModal: () => void;
+  toggleFeed: () => void;
 }
 
 export const useNavStore = create<NavState & NavActions>()((set) => ({
@@ -43,8 +44,9 @@ export const useNavStore = create<NavState & NavActions>()((set) => ({
   liquidationSubTab: "short",
   liqTimeframe: "1h",
   liqMinPct: 80,
-modalSymbol: null,
+  modalSymbol: null,
   modalExtra: null,
+  feedOpen: true,
 
   setActiveNavTab: (tab) => set({ activeNavTab: tab, modalSymbol: null }),
   setAthAtlSubTab: (tab) => set({ athAtlSubTab: tab }),
@@ -56,4 +58,5 @@ modalSymbol: null,
   openModal: (symbol) => set({ modalSymbol: symbol, modalExtra: null }),
   openModalWithExtra: (symbol, extra) => set({ modalSymbol: symbol, modalExtra: extra }),
   closeModal: () => set({ modalSymbol: null, modalExtra: null }),
+  toggleFeed: () => set((s) => ({ feedOpen: !s.feedOpen })),
 }));

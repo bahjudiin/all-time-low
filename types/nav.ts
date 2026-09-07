@@ -5,6 +5,7 @@ export type NavTabId =
   | "pump-dump"
   | "over-under"
   | "liquidations"
+  | "signals"
   | "settings";
 
 export type AthAtlSubTab = "near-ath" | "near-atl" | "signals";
@@ -29,29 +30,20 @@ export interface CoinGlance {
 export interface NavItem {
   id: NavTabId;
   label: string;
+  icon: string;
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { id: "ath-atl", label: "ATH/ATL" },
-  { id: "pump-dump", label: "Pump/Dump" },
-  { id: "over-under", label: "O/U" },
-  { id: "liquidations", label: "Liq" },
-  { id: "settings", label: "Settings" },
+  { id: "ath-atl", label: "ATH / ATL", icon: "trophy" },
+  { id: "pump-dump", label: "Pump / Dump", icon: "zap" },
+  { id: "over-under", label: "Over / Under", icon: "bar" },
+  { id: "liquidations", label: "Liquidations", icon: "activity" },
+  { id: "signals", label: "Signals", icon: "radio" },
+  { id: "settings", label: "Settings", icon: "settings" },
 ];
 
-// Timeframes for liquidations signals: user wants coarse match by direction + timeframe
 export const LIQ_TIMEFRAMES = [
-  "1m",
-  "5m",
-  "10m",
-  "15m",
-  "1h",
-  "4h",
-  "12h",
-  "24h",
-  "7d",
-  "14d",
-  "30d",
+  "1m", "5m", "10m", "15m", "1h", "4h", "12h", "24h", "7d", "14d", "30d",
 ] as const;
 export type LiqTimeframe = (typeof LIQ_TIMEFRAMES)[number];
 
@@ -63,15 +55,12 @@ export interface LiqSignal {
   shortPct: number;
   count: number;
   timeframe: LiqTimeframe;
-  // cross-timeframe direction agreement
   agreementPct: number;
   agreementSamples: number;
-  // derived forecast from liquidation direction
   predictedPump: boolean;
   predictedDump: boolean;
 }
 
-// Extra data shown inside the coin detail modal (optional per tab)
 export interface CoinDetailExtra {
   overvalued?: OvervaluedUndervaluedResult;
   signals?: unknown;

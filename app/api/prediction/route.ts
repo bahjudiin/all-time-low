@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchExchangeData } from "@/lib/exchange";
 import { computePrediction } from "@/lib/prediction";
+import { cachedGet } from "@/lib/cache";
+import { sleep } from "@/lib/sleep";
 import type { CoinMarket } from "@/types/coin";
 import type { CoinPrediction } from "@/types/prediction";
 
@@ -11,13 +13,21 @@ const DELAY_MS = 150;
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
 const TIMEOUT_MS = 20000;
 
-async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+const VALID_CURRENCIES = new Set(["usd", "eur", "gbp", "jpy", "aud", "cad", "chf", "cny", "krw", "inr", "brl", "rub", "try", "zar"]);
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+function validateCurrency(raw: string | null): string {
+  if (raw && VALID_CURRENCIES.has(raw.toLowerCase())) return raw.toLowerCase();
+  return "usd";
 }
 
-async function fetchCoinsPage(page: number, perPage: number): Promise<CoinMarket[]> {
+async function fetchCoinsPage(page: number, perPage: number, currency: string): Promise<CoinMarket[]> {
   const params = new URLSearchParams({
-    vs_currency: "usd",
+    vs_currency: currency,
     order: "market_cap_desc",
     per_page: String(perPage),
     page: String(page),
@@ -43,35 +53,49 @@ async function fetchCoinsPage(page: number, perPage: number): Promise<CoinMarket
   }
 }
 
-async function fetchLowCapCoins(): Promise<CoinMarket[]> {
+async function fetchLowCapCoins(currency: string): Promise<CoinMarket[]> {
   const seen = new Set<string>();
   const lowCaps: CoinMarket[] = [];
 
-  // Fetch pages 1-5 (covers ~1250 coins by market cap)
-  // Low caps start around page 3+ (ranks 500+)
-  for (let page = 1; page <= 5; page++) {
-    const coins = await fetchCoinsPage(page, 250);
-    if (coins.length === 0) break;
+  const BATCH_SIZE = 3;
+  const pages = [1, 2, 3, 4, 5];
+  let successfulPages = 0;
 
-    for (const coin of coins) {
-      if (seen.has(coin.id)) continue;
-      seen.add(coin.id);
+  for (let i = 0; i < pages.length; i += BATCH_SIZE) {
+    const batch = pages.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map((page) => fetchCoinsPage(page, 250, currency))
+    );
 
-      // Low cap: market cap < $200M, volume > $3M
-      // Also include mid-low caps with very high volume
-      const isLowCap = coin.market_cap > 0 && coin.market_cap < 200_000_000 && coin.total_volume > 3_000_000;
-      const isHighVolLowCap = coin.market_cap > 0 && coin.market_cap < 500_000_000 && coin.total_volume > 10_000_000;
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j];
+      if (result.status === "fulfilled") {
+        successfulPages++;
+        for (const coin of result.value) {
+          if (seen.has(coin.id)) continue;
+          seen.add(coin.id);
 
-      if (isLowCap || isHighVolLowCap) {
-        lowCaps.push(coin);
+          const isLowCap = coin.market_cap > 0 && coin.market_cap < 200_000_000 && coin.total_volume > 3_000_000;
+          const isHighVolLowCap = coin.market_cap > 0 && coin.market_cap < 500_000_000 && coin.total_volume > 10_000_000;
+
+          if (isLowCap || isHighVolLowCap) {
+            lowCaps.push(coin);
+          }
+        }
+      } else {
+        console.error("[prediction] fetchCoinsPage failed:", { page: batch[j], error: result.reason });
       }
     }
 
-    // Delay between pages to respect rate limits
-    if (page < 5) await sleep(1000);
+    if (i + BATCH_SIZE < pages.length) {
+      await sleep(200);
+    }
   }
 
-  // Sort by volume descending — most active first
+  if (successfulPages === 0) {
+    throw new Error("All CoinGecko pages failed");
+  }
+
   return lowCaps.sort((a, b) => b.total_volume - a.total_volume);
 }
 
@@ -85,25 +109,19 @@ async function processPredictions(
 
     const batchResults = await Promise.allSettled(
       batch.map(async (coin) => {
-        try {
-          const data = await fetchExchangeData(coin.id, coin.symbol.toLowerCase());
-          if (!data || data.klines.length < 30) return null;
+        const data = await fetchExchangeData(coin.id, coin.symbol.toLowerCase());
+        if (!data || data.klines.length < 30) return null;
 
-          const prediction = computePrediction(
-            coin.symbol.toUpperCase(),
-            coin.name,
-            coin.image,
-            coin.current_price,
-            data.klines,
-            data.takerRatio,
-            false,
-            data.source,
-          );
-
-          return prediction;
-        } catch {
-          return null;
-        }
+        return computePrediction(
+          coin.symbol.toUpperCase(),
+          coin.name,
+          coin.image,
+          coin.current_price,
+          data.klines,
+          data.takerRatio,
+          false,
+          data.source,
+        );
       })
     );
 
@@ -123,29 +141,33 @@ async function processPredictions(
   return results;
 }
 
+export async function OPTIONS() {
+  return NextResponse.json(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const currency = searchParams.get("currency") || "usd";
+  const currency = validateCurrency(searchParams.get("currency"));
 
   try {
-    const lowCapCoins = await fetchLowCapCoins();
+    const data = await cachedGet(`prediction:${currency}`, 60_000, async () => {
+      const lowCapCoins = await fetchLowCapCoins(currency);
+      if (lowCapCoins.length === 0) return [];
+      return processPredictions(lowCapCoins);
+    });
 
-    if (lowCapCoins.length === 0) {
-      return NextResponse.json([]);
-    }
-
-    const predictions = await processPredictions(lowCapCoins);
-
-    return NextResponse.json(predictions, {
+    return NextResponse.json(data, {
       headers: {
-        "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300",
+        ...CORS_HEADERS,
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
       },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[prediction] handler error:", { currency, error: message });
     return NextResponse.json(
       { error: "Failed to fetch prediction data", details: message },
-      { status: 502 }
+      { status: 502, headers: CORS_HEADERS }
     );
   }
 }

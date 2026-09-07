@@ -79,8 +79,8 @@ export function computeMatrix(
 ): MatrixCell[][] {
   if (events.length === 0) return [];
 
-  const minTs = Math.min(...events.map((e) => e.ts));
-  const maxTs = Math.max(...events.map((e) => e.ts));
+  const minTs = events.reduce((m, e) => (e.ts < m ? e.ts : m), events[0].ts);
+  const maxTs = events.reduce((m, e) => (e.ts > m ? e.ts : m), events[0].ts);
 
   if (minTs === maxTs) {
     const symbols = [...new Set(events.map((e) => e.symbol))];

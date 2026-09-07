@@ -1,22 +1,26 @@
 "use client";
 
 import useSWR from "swr";
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import type { CoinMarket, CoinWithDerived } from "@/types/coin";
 import { computeDerived } from "@/lib/coingecko";
 import { isStable, isLowVolatility, hasNoMovement } from "@/lib/filters";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+    return r.json();
+  });
 
 export function useCoins(initialCoins: CoinMarket[]) {
-  const { data: rawCoins, isLoading } = useSWR<CoinMarket[]>(
+  const { data: rawCoins, isLoading, error } = useSWR<CoinMarket[]>(
     "/api/coins?currency=usd",
     fetcher,
     {
       fallbackData: initialCoins,
       refreshInterval: 120_000,
-      revalidateOnFocus: false,
-      revalidateOnMount: false,
+      revalidateOnFocus: true,
+      revalidateOnMount: true,
       dedupingInterval: 60_000,
     }
   );
@@ -34,8 +38,11 @@ export function useCoins(initialCoins: CoinMarket[]) {
     return map;
   }, [coins]);
 
-  const resolveCoin = (symbol: string): CoinWithDerived | null =>
-    bySymbol.get(symbol.toLowerCase()) ?? null;
+  const resolveCoin = useCallback(
+    (symbol: string): CoinWithDerived | null =>
+      bySymbol.get(symbol.toLowerCase()) ?? null,
+    [bySymbol]
+  );
 
-  return { coins, bySymbol, resolveCoin, isLoading };
+  return { coins, bySymbol, resolveCoin, isLoading, error };
 }

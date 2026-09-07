@@ -30,15 +30,25 @@ function sma(values: number[], period: number): number[] {
 
 function ema(values: number[], period: number): number[] {
   const k = 2 / (period + 1);
-  const result: number[] = [values[0]];
-  for (let i = 1; i < values.length; i++) {
-    if (isNaN(result[i - 1])) {
-      result.push(values[i]);
+  const result: number[] = [];
+  for (let i = 0; i < values.length; i++) {
+    if (isNaN(values[i])) {
+      result.push(result[i - 1] ?? NaN);
+    } else if (i < period - 1) {
+      result.push(NaN);
+    } else if (i === period - 1) {
+      let sum = 0;
+      for (let j = 0; j < period; j++) sum += valueOrZero(values[j]);
+      result.push(sum / period);
     } else {
       result.push(values[i] * k + result[i - 1] * (1 - k));
     }
   }
   return result;
+}
+
+function valueOrZero(v: number): number {
+  return isNaN(v) ? 0 : v;
 }
 
 function trueRange(klines: BinanceKline[]): number[] {
@@ -71,8 +81,7 @@ export function calcRSI(closes: number[], period: number = 14): RSIResult {
     avgLoss = (avgLoss * (period - 1) + (diff < 0 ? -diff : 0)) / period;
   }
 
-  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-  const value = 100 - 100 / (1 + rs);
+  const value = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
 
   let signal: -1 | 0 | 1 = 0;
   if (value <= 30) signal = 1;
@@ -83,13 +92,39 @@ export function calcRSI(closes: number[], period: number = 14): RSIResult {
 
 // ── Stochastic RSI (14, 14, 3, 3) ─────────────────────────────────
 
+function calcRSISeries(closes: number[], period: number = 14): number[] {
+  const result: number[] = [];
+  if (closes.length < period + 1) {
+    for (let i = 0; i < closes.length; i++) result.push(50);
+    return result;
+  }
+
+  let gains = 0;
+  let losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) gains += diff;
+    else losses -= diff;
+  }
+
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    avgGain = (avgGain * (period - 1) + (diff > 0 ? diff : 0)) / period;
+    avgLoss = (avgLoss * (period - 1) + (diff < 0 ? -diff : 0)) / period;
+    result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
+  }
+
+  return result;
+}
+
 export function calcStochRSI(closes: number[]): StochRSIResult {
   if (closes.length < 28) return { k: 50, d: 50, signal: 0, label: "50/50" };
 
-  const rsiValues: number[] = [];
-  for (let i = 14; i < closes.length; i++) {
-    rsiValues.push(calcRSI(closes.slice(0, i + 1), 14).value);
-  }
+  const rsiValues = calcRSISeries(closes, 14);
 
   if (rsiValues.length < 14) return { k: 50, d: 50, signal: 0, label: "50/50" };
 
@@ -209,22 +244,40 @@ export function calcADX(klines: BinanceKline[], period: number = 14): ADXResult 
     minusDM.push(downMove > upMove && downMove > 0 ? downMove : 0);
   }
 
-  const atrSmooth = ema(tr.slice(1), period);
-  const plusDMSmooth = ema(plusDM, period);
-  const minusDMSmooth = ema(minusDM, period);
+  const wilder = (values: number[]): number[] => {
+    const result: number[] = [];
+    if (values.length === 0) return result;
+    let sum = 0;
+    for (let i = 0; i < values.length; i++) {
+      if (i < period) {
+        sum += values[i];
+        result.push(i === period - 1 ? sum / period : NaN);
+      } else {
+        result.push(result[i - 1] + (values[i] - result[i - 1]) / period);
+      }
+    }
+    return result;
+  };
+
+  const trSmooth = wilder(tr.slice(1));
+  const plusDMSmooth = wilder(plusDM);
+  const minusDMSmooth = wilder(minusDM);
 
   const dx: number[] = [];
-  for (let i = 0; i < atrSmooth.length; i++) {
-    const pdi = atrSmooth[i] === 0 ? 0 : (plusDMSmooth[i] / atrSmooth[i]) * 100;
-    const mdi = atrSmooth[i] === 0 ? 0 : (minusDMSmooth[i] / atrSmooth[i]) * 100;
+  for (let i = 0; i < trSmooth.length; i++) {
+    if (isNaN(trSmooth[i])) continue;
+    const atrValue = trSmooth[i];
+    const pdi = atrValue === 0 ? 0 : (plusDMSmooth[i] / atrValue) * 100;
+    const mdi = atrValue === 0 ? 0 : (minusDMSmooth[i] / atrValue) * 100;
     const sum = pdi + mdi;
     dx.push(sum === 0 ? 0 : (Math.abs(pdi - mdi) / sum) * 100);
   }
 
-  const adxValues = ema(dx, period);
+  const adxValues = wilder(dx);
   const adx = adxValues[adxValues.length - 1] || 0;
-  const lastPDI = atrSmooth.length === 0 ? 0 : (plusDMSmooth[plusDMSmooth.length - 1] / atrSmooth[atrSmooth.length - 1]) * 100;
-  const lastMDI = atrSmooth.length === 0 ? 0 : (minusDMSmooth[minusDMSmooth.length - 1] / atrSmooth[atrSmooth.length - 1]) * 100;
+  const lastATR = trSmooth.length > 0 ? trSmooth[trSmooth.length - 1] : 0;
+  const lastPDI = lastATR === 0 ? 0 : (plusDMSmooth[plusDMSmooth.length - 1] / lastATR) * 100;
+  const lastMDI = lastATR === 0 ? 0 : (minusDMSmooth[minusDMSmooth.length - 1] / lastATR) * 100;
 
   let trendStrength: "strong" | "moderate" | "weak" | "none" = "none";
   if (adx >= 40) trendStrength = "strong";
@@ -258,7 +311,9 @@ export function calcBollinger(closes: number[], period: number = 20, stdDev: num
 
   const window = closes.slice(-period);
   const mean = window.reduce((a, b) => a + b, 0) / window.length;
-  const variance = window.reduce((a, b) => a + (b - mean) ** 2, 0) / window.length;
+  const variance = window.length > 1
+    ? window.reduce((a, b) => a + (b - mean) ** 2, 0) / (window.length - 1)
+    : 0;
   const std = Math.sqrt(variance);
 
   const upper = middle + stdDev * std;
@@ -410,9 +465,6 @@ export function calcATHATL(
   else if (midRangePct < -30) signal = 1;
   else if (midRangePct > 30) signal = -1;
 
-  const athAge = getAgeLabel(athDate);
-  const atlAge = getAgeLabel(atlDate);
-
   return {
     athPrice: ath,
     athChangePct: Math.round(athChangePct * 10) / 10,
@@ -426,14 +478,4 @@ export function calcATHATL(
     signal,
     label: `ATH ${distanceFromATH.toFixed(0)}% | ATL +${distanceFromATL.toFixed(0)}%`,
   };
-}
-
-function getAgeLabel(dateStr: string): string {
-  if (!dateStr) return "—";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days < 1) return "today";
-  if (days < 30) return `${days}d ago`;
-  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
 }

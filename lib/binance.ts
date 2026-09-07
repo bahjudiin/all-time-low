@@ -4,6 +4,7 @@ import type {
   BinanceOpenInterest,
   BinanceLongShortRatio,
 } from "@/types/signal";
+import { fetchJson } from "@/lib/retry";
 
 const BASE_URL = "https://fapi.binance.com";
 const TIMEOUT_MS = 12_000;
@@ -134,16 +135,10 @@ function buildUrl(path: string, params?: Record<string, string | number>): strin
 }
 
 async function fetchWithTimeout<T>(url: string, timeout: number = TIMEOUT_MS): Promise<T | null> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) return null;
-    return (await response.json()) as T;
+    return await fetchJson<T>(url, { timeoutMs: timeout });
   } catch {
     return null;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 

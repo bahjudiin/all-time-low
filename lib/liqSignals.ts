@@ -19,9 +19,9 @@ const WINDOW_MS: Record<LiqSignal["timeframe"], number> = {
 // Windows used to test cross-timeframe direction agreement (subset of the above)
 const AGREEMENT_WINDOWS: LiqSignal["timeframe"][] = ["5m", "10m", "1h", "4h", "12h", "24h", "7d"];
 
-function dominantFor(events: LiquidationEvent[], symbol: string, windowMs: number): "long" | "short" | "mixed" | "none" {
+function dominantFor(symbolEvents: LiquidationEvent[], windowMs: number): "long" | "short" | "mixed" | "none" {
   const cutoff = Date.now() - windowMs;
-  const inWindow = events.filter((e) => e.symbol === symbol && e.ts >= cutoff);
+  const inWindow = symbolEvents.filter((e) => e.ts >= cutoff);
   if (inWindow.length === 0) return "none";
   const longUsd = inWindow.filter((e) => e.side === "long").reduce((s, e) => s + e.usdValue, 0);
   const shortUsd = inWindow.filter((e) => e.side === "short").reduce((s, e) => s + e.usdValue, 0);
@@ -31,6 +31,16 @@ function dominantFor(events: LiquidationEvent[], symbol: string, windowMs: numbe
   if (longPct >= DOMINANCE_THRESHOLD) return "long";
   if (shortUsd / total >= DOMINANCE_THRESHOLD) return "short";
   return "mixed";
+}
+
+function indexBySymbol(events: LiquidationEvent[]): Map<string, LiquidationEvent[]> {
+  const bySymbol = new Map<string, LiquidationEvent[]>();
+  for (const e of events) {
+    const arr = bySymbol.get(e.symbol) ?? [];
+    arr.push(e);
+    bySymbol.set(e.symbol, arr);
+  }
+  return bySymbol;
 }
 
 export function computeLiqSignals(
@@ -43,6 +53,8 @@ export function computeLiqSignals(
   const cutoff = Date.now() - windowMs;
   const inWindow = events.filter((e) => e.ts >= cutoff);
   if (inWindow.length === 0) return [];
+
+  const bySymbol = indexBySymbol(events);
 
   const map = new Map<string, { longUsd: number; shortUsd: number; count: number }>();
   for (const e of inWindow) {
@@ -69,10 +81,11 @@ export function computeLiqSignals(
       : "mixed";
 
     // How many agreement windows agree on the same direction (>= 80% dominance in that window)
+    const symbolEvents = bySymbol.get(symbol) ?? [];
     let agreed = 0;
     let tested = 0;
     for (const w of AGREEMENT_WINDOWS) {
-      const d = dominantFor(events, symbol, WINDOW_MS[w]);
+      const d = dominantFor(symbolEvents, WINDOW_MS[w]);
       if (d === "none") continue;
       tested++;
       if (d === dominantSide) agreed++;
@@ -88,8 +101,10 @@ export function computeLiqSignals(
       timeframe,
       agreementPct: tested > 0 ? (agreed / tested) * 100 : 100,
       agreementSamples: tested,
-      predictedPump: dominantSide === "long",
-      predictedDump: dominantSide === "short",
+      // Long liquidations = forced selling = downward pressure; short
+      // liquidations = covering/buying = upward pressure.
+      predictedPump: dominantSide === "short",
+      predictedDump: dominantSide === "long",
     });
   }
 

@@ -18,7 +18,7 @@ export function SignalsClient() {
   const { currency, search } = useScreenerStore();
   const [sortBy, setSortBy] = useState<"score" | "market_cap" | "change24h">("score");
 
-  const { data: coins, isLoading } = useSWR<CoinWithSignals[]>(
+  const { data: coins, isLoading, error, mutate } = useSWR<CoinWithSignals[]>(
     `/api/signals?currency=${currency}`,
     fetcher,
     {
@@ -71,13 +71,13 @@ export function SignalsClient() {
   return (
     <>
       {/* Header bar */}
-      <div className="flex items-center justify-between px-6 py-2 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="flex items-center justify-between px-6 py-2 border-b border-border">
         <div className="flex items-center gap-4 text-xs">
-          <span className="text-emerald-400 font-semibold">{summary.strongLong} Strong Long</span>
-          <span className="text-emerald-300">{summary.long} Long</span>
-          <span className="text-zinc-500">{summary.wait} Wait</span>
-          <span className="text-red-300">{summary.short} Short</span>
-          <span className="text-red-400 font-semibold">{summary.strongShort} Strong Short</span>
+          <span className="text-green font-semibold">{summary.strongLong} Strong Long</span>
+          <span className="text-green">{summary.long} Long</span>
+          <span className="text-text-tertiary">{summary.wait} Wait</span>
+          <span className="text-red">{summary.short} Short</span>
+          <span className="text-red font-semibold">{summary.strongShort} Strong Short</span>
         </div>
         <div className="flex items-center gap-1">
           {(["score", "market_cap", "change24h"] as const).map((s) => (
@@ -86,8 +86,8 @@ export function SignalsClient() {
               onClick={() => setSortBy(s)}
               className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
                 sortBy === s
-                  ? "bg-blue-600 text-white"
-                  : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  ? "bg-accent text-white"
+                  : "text-text-tertiary hover:bg-surface-hover"
               }`}
             >
               {s === "score" ? "By Signal" : s === "market_cap" ? "By Market Cap" : "By Change"}
@@ -101,17 +101,32 @@ export function SignalsClient() {
         {isLoading && (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
-              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-zinc-500">Computing signals for all coins...</p>
+              <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-text-tertiary">Computing signals for all coins...</p>
             </div>
           </div>
         )}
 
-        {!isLoading && filteredCoins.length === 0 && (
+        {error && !coins && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center px-6">
+              <p className="text-sm text-text-tertiary mb-1">Failed to load signals</p>
+              <p className="text-xs text-text-muted mb-3">{(error as Error).message || "Network error"}</p>
+              <button
+                onClick={() => mutate()}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isLoading && !error && filteredCoins.length === 0 && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <p className="text-zinc-500 mb-2">No signals available</p>
-              <p className="text-xs text-zinc-600">Binance futures data is being fetched</p>
+              <p className="text-text-tertiary mb-2">No signals available</p>
+              <p className="text-xs text-text-muted">Binance futures data is being fetched</p>
             </div>
           </div>
         )}

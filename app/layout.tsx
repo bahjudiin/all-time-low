@@ -1,16 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "ATH/ATL Tracker",
@@ -28,7 +18,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#3b82f6",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0e1420" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f8fa" },
+  ],
 };
 
 export default function RootLayout({
@@ -37,12 +30,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
-    >
+    <html lang="en" suppressHydrationWarning className="h-full antialiased">
       <head>
         <link rel="apple-touch-icon" href="/icon.svg" />
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");var d=t?t==="dark":window.matchMedia("(prefers-color-scheme:dark)").matches;document.documentElement.classList.toggle("dark",d)}catch(e){}})()`,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground overscroll-none">
         {children}

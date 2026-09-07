@@ -28,7 +28,6 @@ function tryDynamicSymbol(symbol: string): string | null {
 }
 
 async function tryBinance(coingeckoId: string, symbol: string): Promise<ExchangeData | null> {
-  // Try hardcoded mapping first, then dynamic
   const binanceSymbol = COINGECKO_TO_BINANCE[coingeckoId] || COINGECKO_TO_BINANCE[symbol] || tryDynamicSymbol(symbol);
   if (!binanceSymbol) return null;
   try {
@@ -42,7 +41,6 @@ async function tryBinance(coingeckoId: string, symbol: string): Promise<Exchange
 
 async function tryOKX(coingeckoId: string, symbol: string): Promise<ExchangeData | null> {
   const okxSymbol = COINGECKO_TO_OKX[coingeckoId] || COINGECKO_TO_OKX[symbol] || `${symbol.toUpperCase()}-USDT`;
-  if (!okxSymbol) return null;
   try {
     const data = await fetchOKXData(okxSymbol);
     const result: ExchangeData = { ...data, source: "okx" };
@@ -54,7 +52,6 @@ async function tryOKX(coingeckoId: string, symbol: string): Promise<ExchangeData
 
 async function tryBybit(coingeckoId: string, symbol: string): Promise<ExchangeData | null> {
   const bybitSymbol = COINGECKO_TO_BYBIT[coingeckoId] || COINGECKO_TO_BYBIT[symbol] || `${symbol.toUpperCase()}USDT`;
-  if (!bybitSymbol) return null;
   try {
     const data = await fetchBybitData(bybitSymbol);
     const result: ExchangeData = { ...data, source: "bybit" };
@@ -68,14 +65,15 @@ export async function fetchExchangeData(
   coingeckoId: string,
   symbol: string,
 ): Promise<ExchangeData | null> {
-  const binance = await tryBinance(coingeckoId, symbol);
-  if (binance) return binance;
+  const results = await Promise.allSettled([
+    tryBinance(coingeckoId, symbol),
+    tryOKX(coingeckoId, symbol),
+    tryBybit(coingeckoId, symbol),
+  ]);
 
-  const okx = await tryOKX(coingeckoId, symbol);
-  if (okx) return okx;
-
-  const bybit = await tryBybit(coingeckoId, symbol);
-  if (bybit) return bybit;
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value) return r.value;
+  }
 
   return null;
 }
@@ -111,7 +109,6 @@ async function tryBinanceMultiTimeframe(coingeckoId: string, symbol: string): Pr
 
 async function tryOKXMultiTimeframe(coingeckoId: string, symbol: string): Promise<MultiTimeframeExchangeData | null> {
   const okxSymbol = COINGECKO_TO_OKX[coingeckoId] || COINGECKO_TO_OKX[symbol] || `${symbol.toUpperCase()}-USDT-SWAP`;
-  if (!okxSymbol) return null;
   try {
     const data = await fetchOKXMultiTimeframeData(okxSymbol);
     const result: MultiTimeframeExchangeData = { ...data, source: "okx" };
@@ -123,7 +120,6 @@ async function tryOKXMultiTimeframe(coingeckoId: string, symbol: string): Promis
 
 async function tryBybitMultiTimeframe(coingeckoId: string, symbol: string): Promise<MultiTimeframeExchangeData | null> {
   const bybitSymbol = COINGECKO_TO_BYBIT[coingeckoId] || COINGECKO_TO_BYBIT[symbol] || `${symbol.toUpperCase()}USDT`;
-  if (!bybitSymbol) return null;
   try {
     const data = await fetchBybitMultiTimeframeData(bybitSymbol);
     const result: MultiTimeframeExchangeData = { ...data, source: "bybit" };
@@ -137,14 +133,15 @@ export async function fetchMultiTimeframeExchangeData(
   coingeckoId: string,
   symbol: string,
 ): Promise<MultiTimeframeExchangeData | null> {
-  const binance = await tryBinanceMultiTimeframe(coingeckoId, symbol);
-  if (binance) return binance;
+  const results = await Promise.allSettled([
+    tryBinanceMultiTimeframe(coingeckoId, symbol),
+    tryOKXMultiTimeframe(coingeckoId, symbol),
+    tryBybitMultiTimeframe(coingeckoId, symbol),
+  ]);
 
-  const okx = await tryOKXMultiTimeframe(coingeckoId, symbol);
-  if (okx) return okx;
-
-  const bybit = await tryBybitMultiTimeframe(coingeckoId, symbol);
-  if (bybit) return bybit;
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value) return r.value;
+  }
 
   return null;
 }

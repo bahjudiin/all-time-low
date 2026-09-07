@@ -11,6 +11,10 @@ interface OVTableProps {
 
 type SortKey = "opportunityScore" | "overvaluationScore" | "undervaluationScore" | "reversalProbability" | "continuationProbability" | "finalConfidence" | "currentPrice" | "predictedEntry" | "distanceToEntryPct" | "expectedRewardRisk" | "dataQuality" | "priceChange24hPct";
 
+const HIDE_SM = "hidden sm:table-cell";
+const HIDE_MD = "hidden md:table-cell";
+const HIDE_LG = "hidden lg:table-cell";
+
 export function OVTable({ results, onRowClick }: OVTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("opportunityScore");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -35,98 +39,112 @@ export function OVTable({ results, onRowClick }: OVTableProps) {
 
   const sortArrow = (key: SortKey) => key === sortKey ? (sortDir === "desc" ? " ↓" : " ↑") : "";
 
-  const typeColor = (r: OvervaluedUndervaluedResult) =>
-    r.direction === "overvalued" ? "text-red-400" : r.direction === "undervalued" ? "text-emerald-400" : "text-zinc-400";
-
   return (
     <div className="overflow-auto h-full">
-      <table className="w-full text-xs">
-        <thead className="sticky top-0 bg-zinc-100 dark:bg-zinc-900 z-10">
-          <tr className="border-b border-zinc-200 dark:border-zinc-800">
-            <th className="px-3 py-2 text-left font-medium text-zinc-500 whitespace-nowrap">Coin</th>
-            <Th onClick={() => toggleSort("currentPrice")} active={sortKey === "currentPrice"}>{`Price${sortArrow("currentPrice")}`}</Th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">Type</th>
-            <Th onClick={() => toggleSort("opportunityScore")} active={sortKey === "opportunityScore"}>{`Opp${sortArrow("opportunityScore")}`}</Th>
-            <Th onClick={() => toggleSort("overvaluationScore")} active={sortKey === "overvaluationScore"}>{`Oval${sortArrow("overvaluationScore")}`}</Th>
-            <Th onClick={() => toggleSort("undervaluationScore")} active={sortKey === "undervaluationScore"}>{`Uval${sortArrow("undervaluationScore")}`}</Th>
-            <Th onClick={() => toggleSort("reversalProbability")} active={sortKey === "reversalProbability"}>{`Rev${sortArrow("reversalProbability")}`}</Th>
-            <Th onClick={() => toggleSort("continuationProbability")} active={sortKey === "continuationProbability"}>{`Cont${sortArrow("continuationProbability")}`}</Th>
-            <Th onClick={() => toggleSort("finalConfidence")} active={sortKey === "finalConfidence"}>{`Conf${sortArrow("finalConfidence")}`}</Th>
-            <Th onClick={() => toggleSort("predictedEntry")} active={sortKey === "predictedEntry"}>{`Entry${sortArrow("predictedEntry")}`}</Th>
-            <Th onClick={() => toggleSort("distanceToEntryPct")} active={sortKey === "distanceToEntryPct"}>{`Dist${sortArrow("distanceToEntryPct")}`}</Th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">VWAP Δ</th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">RSI 1H</th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">Funding</th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">OI</th>
-            <Th onClick={() => toggleSort("expectedRewardRisk")} active={sortKey === "expectedRewardRisk"}>{`R:R${sortArrow("expectedRewardRisk")}`}</Th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">Regime</th>
-            <th className="px-3 py-2 text-left font-medium text-zinc-500">State</th>
-            <Th onClick={() => toggleSort("priceChange24hPct")} active={sortKey === "priceChange24hPct"}>{`24h${sortArrow("priceChange24hPct")}`}</Th>
+      <table className="w-full mono" style={{ fontSize: 11 }}>
+        <thead className="sticky top-0" style={{ background: "var(--panel-raised)", borderBottom: "1px solid var(--hair)" }}>
+          <tr>
+            <Th>COIN</Th>
+            <Th dir={sortDir} onClick={() => toggleSort("currentPrice")} active={sortKey === "currentPrice"}>{`PRICE${sortArrow("currentPrice")}`}</Th>
+            <Th>DIR</Th>
+            <Th dir={sortDir} onClick={() => toggleSort("opportunityScore")} active={sortKey === "opportunityScore"}>{`OPP${sortArrow("opportunityScore")}`}</Th>
+            <Th hide={HIDE_SM} dir={sortDir} onClick={() => toggleSort("overvaluationScore")} active={sortKey === "overvaluationScore"}>{`OVAL${sortArrow("overvaluationScore")}`}</Th>
+            <Th hide={HIDE_SM} dir={sortDir} onClick={() => toggleSort("undervaluationScore")} active={sortKey === "undervaluationScore"}>{`UVAL${sortArrow("undervaluationScore")}`}</Th>
+            <Th hide={HIDE_SM} dir={sortDir} onClick={() => toggleSort("reversalProbability")} active={sortKey === "reversalProbability"}>{`REV${sortArrow("reversalProbability")}`}</Th>
+            <Th hide={HIDE_MD} dir={sortDir} onClick={() => toggleSort("continuationProbability")} active={sortKey === "continuationProbability"}>{`CONT${sortArrow("continuationProbability")}`}</Th>
+            <Th hide={HIDE_SM} dir={sortDir} onClick={() => toggleSort("finalConfidence")} active={sortKey === "finalConfidence"}>{`CONF${sortArrow("finalConfidence")}`}</Th>
+            <Th dir={sortDir} onClick={() => toggleSort("predictedEntry")} active={sortKey === "predictedEntry"}>{`ENTRY${sortArrow("predictedEntry")}`}</Th>
+            <Th dir={sortDir} onClick={() => toggleSort("distanceToEntryPct")} active={sortKey === "distanceToEntryPct"}>{`DIST${sortArrow("distanceToEntryPct")}`}</Th>
+            <Th hide={HIDE_MD}>VWAP</Th>
+            <Th hide={HIDE_MD}>RSI</Th>
+            <Th hide={HIDE_LG}>FUND</Th>
+            <Th hide={HIDE_LG}>OI</Th>
+            <Th dir={sortDir} onClick={() => toggleSort("expectedRewardRisk")} active={sortKey === "expectedRewardRisk"}>{`R:R${sortArrow("expectedRewardRisk")}`}</Th>
+            <Th hide={HIDE_SM}>REGIME</Th>
+            <Th hide={HIDE_SM}>STATE</Th>
+            <Th dir={sortDir} onClick={() => toggleSort("priceChange24hPct")} active={sortKey === "priceChange24hPct"}>{`24H${sortArrow("priceChange24hPct")}`}</Th>
           </tr>
         </thead>
         <tbody>
           {sorted.map((r) => (
-            <tr key={r.symbol} onClick={() => onRowClick?.(r)} className={`border-b border-zinc-100 dark:border-zinc-800/50 transition-colors ${onRowClick ? "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/30" : "hover:bg-zinc-50 dark:hover:bg-zinc-800/30"}`}>
-              <td className="px-3 py-2 whitespace-nowrap">
-                <div className="flex items-center gap-2">
-                  <img src={r.image} alt="" className="w-5 h-5 rounded-full" loading="lazy" />
+            <tr
+              key={r.symbol}
+              tabIndex={0}
+              role="button"
+              aria-label={`Open ${r.name}`}
+              onClick={() => onRowClick?.(r)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onRowClick?.(r); } }}
+              style={{ borderBottom: "1px solid var(--hair)", cursor: onRowClick ? "pointer" : undefined }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--panel-raised)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
+            >
+              <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <img src={r.image} alt="" style={{ width: 18, height: 18, borderRadius: "50%" }} loading="lazy" />
                   <div>
-                    <div className="font-medium text-zinc-100">{r.name}</div>
-                    <div className="text-[10px] text-zinc-500 uppercase">{r.symbol}</div>
+                    <div title={r.name} style={{ fontWeight: 600, fontSize: 11, color: "var(--ink-primary)", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                    <div style={{ fontSize: 9, color: "var(--muted2)", textTransform: "uppercase" }}>{r.symbol}</div>
                   </div>
                 </div>
               </td>
-              <td className="px-3 py-2 font-mono text-zinc-300">${fmtPrice(r.currentPrice)}</td>
-              <td className={`px-3 py-2 font-medium ${typeColor(r)}`}>
+              <td className="mono" style={{ padding: "8px 10px", color: "var(--ink-secondary)" }}>${fmtPrice(r.currentPrice)}</td>
+              <td style={{ padding: "8px 10px", fontWeight: 600, color: r.direction === "overvalued" ? "var(--short)" : r.direction === "undervalued" ? "var(--long)" : "var(--ink-secondary)" }}>
                 {r.direction === "overvalued" ? "SHORT" : r.direction === "undervalued" ? "LONG" : "—"}
               </td>
-              <td className="px-3 py-2 font-mono font-bold text-zinc-100">{Math.round(r.opportunityScore)}</td>
-              <td className="px-3 py-2 font-mono text-red-400">{Math.round(r.overvaluationScore)}</td>
-              <td className="px-3 py-2 font-mono text-emerald-400">{Math.round(r.undervaluationScore)}</td>
-              <td className="px-3 py-2 font-mono text-zinc-300">{Math.round(r.reversalProbability)}</td>
-              <td className="px-3 py-2 font-mono text-zinc-400">{Math.round(r.continuationProbability)}</td>
-              <td className="px-3 py-2 font-mono text-zinc-300">{Math.round(r.finalConfidence)}</td>
-              <td className="px-3 py-2 font-mono text-amber-300">${fmtPrice(r.predictedEntry)}</td>
-              <td className={`px-3 py-2 font-mono ${r.distanceToEntryPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              <td className="mono" style={{ padding: "8px 10px", fontWeight: 700, color: "var(--ink-primary)" }}>{Math.round(r.opportunityScore)}</td>
+              <td className={`mono ${HIDE_SM}`} style={{ padding: "8px 10px", color: "var(--short)" }}>{Math.round(r.overvaluationScore)}</td>
+              <td className={`mono ${HIDE_SM}`} style={{ padding: "8px 10px", color: "var(--long)" }}>{Math.round(r.undervaluationScore)}</td>
+              <td className={`mono ${HIDE_SM}`} style={{ padding: "8px 10px", color: "var(--ink-secondary)" }}>{Math.round(r.reversalProbability)}</td>
+              <td className={`mono ${HIDE_MD}`} style={{ padding: "8px 10px", color: "var(--ink-secondary)" }}>{Math.round(r.continuationProbability)}</td>
+              <td className={`mono ${HIDE_SM}`} style={{ padding: "8px 10px", color: "var(--ink-secondary)" }}>{Math.round(r.finalConfidence)}</td>
+              <td className="mono" style={{ padding: "8px 10px", color: "var(--amber)" }}>${fmtPrice(r.predictedEntry)}</td>
+              <td className="mono" style={{ padding: "8px 10px", color: r.distanceToEntryPct >= 0 ? "var(--long)" : "var(--short)" }}>
                 {r.distanceToEntryPct > 0 ? "+" : ""}{r.distanceToEntryPct.toFixed(2)}%
               </td>
-              <td className={`px-3 py-2 font-mono ${r.factors.fairValue.combinedDeviation > 0 ? "text-red-400" : "text-emerald-400"}`}>
+              <td className={`mono ${HIDE_MD}`} style={{ padding: "8px 10px", color: r.factors.fairValue.combinedDeviation > 0 ? "var(--short)" : "var(--long)" }}>
                 {r.factors.fairValue.combinedDeviation > 0 ? "+" : ""}{r.factors.fairValue.combinedDeviation}%
               </td>
-              <td className="px-3 py-2 font-mono text-zinc-300">{r.factors.momentum.rsi1h}</td>
-              <td className={`px-3 py-2 font-mono ${r.factors.crowding.fundingRate > 0 ? "text-red-400" : r.factors.crowding.fundingRate < 0 ? "text-emerald-400" : "text-zinc-400"}`}>
+              <td className={`mono ${HIDE_MD}`} style={{ padding: "8px 10px", color: "var(--ink-secondary)" }}>{r.factors.momentum.rsi1h}</td>
+              <td className={`mono ${HIDE_LG}`} style={{ padding: "8px 10px", color: r.factors.crowding.fundingRate > 0 ? "var(--short)" : r.factors.crowding.fundingRate < 0 ? "var(--long)" : "var(--ink-secondary)" }}>
                 {r.factors.crowding.fundingRate > 0 ? "+" : ""}{r.factors.crowding.fundingRate}%
               </td>
-              <td className="px-3 py-2 font-mono text-zinc-400">{r.factors.crowding.oiChange1hPct > 0 ? "+" : ""}{r.factors.crowding.oiChange1hPct}%</td>
-              <td className={`px-3 py-2 font-mono ${r.expectedRewardRisk >= 2 ? "text-emerald-400" : r.expectedRewardRisk >= 1.5 ? "text-amber-400" : "text-red-400"}`}>
+              <td className={`mono ${HIDE_LG}`} style={{ padding: "8px 10px", color: "var(--ink-secondary)" }}>{r.factors.crowding.oiChange1hPct > 0 ? "+" : ""}{r.factors.crowding.oiChange1hPct}%</td>
+              <td className="mono" style={{ padding: "8px 10px", color: r.expectedRewardRisk >= 2 ? "var(--long)" : r.expectedRewardRisk >= 1.5 ? "var(--amber)" : "var(--short)" }}>
                 {r.expectedRewardRisk.toFixed(1)}
               </td>
-              <td className="px-3 py-2 text-zinc-400 whitespace-nowrap">{r.marketRegime}</td>
-              <td className="px-3 py-2 whitespace-nowrap">
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">
+              <td className={HIDE_SM} style={{ padding: "8px 10px", color: "var(--ink-secondary)", whiteSpace: "nowrap" }}>{r.marketRegime}</td>
+              <td className={HIDE_SM} style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                <span className="mono" style={{ fontSize: 9, padding: "2px 6px", background: "var(--panel-raised)", border: "1px solid var(--hair)", borderRadius: 2 }}>
                   {r.signalState.replace(/_/g, " ")}
                 </span>
               </td>
-              <td className={`px-3 py-2 font-mono ${r.priceChange24hPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              <td className="mono" style={{ padding: "8px 10px", color: r.priceChange24hPct >= 0 ? "var(--long)" : "var(--short)" }}>
                 {r.priceChange24hPct > 0 ? "+" : ""}{r.priceChange24hPct.toFixed(2)}%
               </td>
             </tr>
           ))}
+          {sorted.length === 0 && (
+            <tr><td colSpan={8} style={{ padding: "40px 0", textAlign: "center", fontSize: 11, color: "var(--muted2)" }}>No coins match your filters</td></tr>
+          )}
         </tbody>
       </table>
     </div>
   );
 }
 
-function Th({ children, onClick, active }: { children: ReactNode; onClick: () => void; active: boolean }) {
+function Th({ children, onClick, active, hide = "", dir }: { children: ReactNode; onClick?: () => void; active?: boolean; hide?: string; dir?: "asc" | "desc" }) {
+  const style: React.CSSProperties = { padding: "8px 10px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" };
+  if (onClick) { style.cursor = "pointer"; }
   return (
-    <th
-      onClick={onClick}
-      className={`px-3 py-2 text-left font-medium whitespace-nowrap cursor-pointer select-none transition-colors ${
-        active ? "text-blue-400" : "text-zinc-500 hover:text-zinc-300"
-      }`}
-    >
-      {children}
+    <th className={`${hide}`} style={style} aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : undefined}>
+      <button
+        type="button"
+        onClick={onClick}
+        className="mono"
+        style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: active ? "var(--amber)" : "var(--muted2)", background: "none", border: "none", padding: 0, cursor: onClick ? "pointer" : undefined }}
+      >
+        {children}
+      </button>
     </th>
   );
 }

@@ -41,21 +41,6 @@ export const STABLECOINS = new Set([
   "usdr",
   "wusd",
   "usde",
-  "savax",
-  "reth",
-  "tbtc",
-  "wbtc",
-  "wsteth",
-  "steth",
-  "cbeth",
-  "wbeth",
-  "weeth",
-  "ezeth",
-  "rseth",
-  "rsweth",
-  "soloeth",
-  "oseth",
-  "diamond",
 ]);
 
 const NEAR_ATH_THRESHOLD = -5;
@@ -74,7 +59,7 @@ export function isLowVolatility(coin: CoinWithDerived): boolean {
 }
 
 export function hasNoMovement(coin: CoinWithDerived): boolean {
-  if (coin.ath <= 0 || coin.atl <= 0) return false;
+  if (coin.ath <= 0 || coin.atl <= 0) return true;
   return coin.ath / coin.atl < ATH_ATL_MIN_RATIO;
 }
 
@@ -83,7 +68,7 @@ export function isNearATH(coin: CoinWithDerived): boolean {
 }
 
 export function isPastATH(coin: CoinWithDerived): boolean {
-  return coin.ath_change_percentage > EXTREME_ATH_PASSED;
+  return coin.ath_change_percentage >= EXTREME_ATH_PASSED;
 }
 
 export function isNearATL(coin: CoinWithDerived): boolean {

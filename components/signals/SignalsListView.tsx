@@ -15,7 +15,7 @@ export function SignalsListView() {
   const openModal = useNavStore((s) => s.openModal);
   const [dir, setDir] = useState<"all" | SignalDirection>("all");
 
-  const { data: signalCoins, isLoading } = useSWR<(CoinMarket & { signals?: CoinSignals })[]>(
+  const { data: signalCoins, isLoading, error, mutate } = useSWR<(CoinMarket & { signals?: CoinSignals })[]>(
     "/api/signals?currency=usd",
     fetcher,
     { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 120_000 }
@@ -43,40 +43,65 @@ export function SignalsListView() {
   }, [signalCoins]);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 md:px-6 py-2 border-b border-zinc-200 dark:border-zinc-800 text-[11px]">
-        <div className="flex items-center gap-3">
-          <span className="text-emerald-400 font-semibold">{summary.strongLong} SL</span>
-          <span className="text-emerald-300">{summary.long} L</span>
-          <span className="text-zinc-500">{summary.wait} W</span>
-          <span className="text-red-300">{summary.short} S</span>
-          <span className="text-red-400 font-semibold">{summary.strongShort} SS</span>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div className="mono" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid var(--hair)", fontSize: 11 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ color: "var(--long)", fontWeight: 600 }}>{summary.strongLong} SL</span>
+          <span style={{ color: "var(--long)" }}>{summary.long} L</span>
+          <span style={{ color: "var(--muted2)" }}>{summary.wait} W</span>
+          <span style={{ color: "var(--short)" }}>{summary.short} S</span>
+          <span style={{ color: "var(--short)", fontWeight: 600 }}>{summary.strongShort} SS</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
           {(["all", "strong_long", "long", "short", "strong_short"] as const).map((d) => (
             <button
               key={d}
               onClick={() => setDir(d)}
-              className={`px-2 py-1 text-[10px] rounded transition-colors ${
-                dir === d ? "bg-blue-600 text-white" : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              }`}
+              className="mono"
+              style={{
+                padding: "3px 8px",
+                fontSize: 10,
+                border: "none",
+                borderRadius: 2,
+                background: dir === d ? "var(--amber)" : "none",
+                color: dir === d ? "var(--ink)" : "var(--muted2)",
+                cursor: "pointer",
+                fontWeight: dir === d ? 700 : 400,
+              }}
             >
-              {d === "all" ? "All" : d === "strong_long" ? "SL" : d === "long" ? "L" : d === "short" ? "S" : "SS"}
+              {d === "all" ? "ALL" : d === "strong_long" ? "SL" : d === "long" ? "L" : d === "short" ? "S" : "SS"}
             </button>
           ))}
         </div>
       </div>
-      <div className="flex-1 overflow-auto p-3 md:p-4">
+      <div style={{ flex: 1, overflow: "auto", padding: 12 }}>
         {isLoading && (
-          <div className="flex flex-col items-center gap-3 py-16">
-            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs text-zinc-500">Computing signals...</p>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "60px 0" }}>
+            <div style={{ width: 20, height: 20, border: "2px solid var(--amber)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+            <p className="mono" style={{ fontSize: 11, color: "var(--muted2)" }}>Computing signals...</p>
           </div>
         )}
-        {!isLoading && filtered.length === 0 && <p className="text-xs text-zinc-500 text-center py-16">No signals available</p>}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {error && !signalCoins && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "60px 0", textAlign: "center" }}>
+            <p className="mono" style={{ fontSize: 11, color: "var(--muted2)" }}>Failed to load signals</p>
+            <p style={{ fontSize: 10, color: "var(--muted)" }}>{(error as Error).message || "Network error"}</p>
+            <button onClick={() => mutate()} style={{ padding: "6px 12px", fontSize: 11, border: "1px solid var(--amber)", background: "none", color: "var(--amber)", borderRadius: 2, cursor: "pointer" }}>Retry</button>
+          </div>
+        )}
+        {!isLoading && !error && filtered.length === 0 && (
+          <p className="mono" style={{ fontSize: 11, color: "var(--muted2)", textAlign: "center", padding: "60px 0" }}>No signals available</p>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 8 }}>
           {filtered.map((coin) => (
-            <div key={coin.id} onClick={() => openModal(coin.symbol)} className="cursor-pointer">
+            <div
+              key={coin.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${coin.name} chart`}
+              onClick={() => openModal(coin.symbol)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openModal(coin.symbol); } }}
+              style={{ cursor: "pointer" }}
+            >
               <SignalCardDetailed coin={coin as CoinWithDerived} signals={coin.signals!} />
             </div>
           ))}

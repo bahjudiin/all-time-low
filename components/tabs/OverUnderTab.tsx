@@ -3,9 +3,9 @@
 import { useNavStore } from "@/lib/navStore";
 import { OvervaluedUndervaluedClient } from "@/components/overvalued/OvervaluedUndervaluedClient";
 import { SignalsListView } from "@/components/signals/SignalsListView";
-import { SubTabBar } from "@/components/layout/SubTabBar";
 import type { OverUnderSubTab } from "@/types/nav";
 import type { OvervaluedUndervaluedResult } from "@/lib/overvaluedUndervalued";
+import { SubTabBar } from "@/components/layout/SubTabBar";
 
 export function OverUnderTab() {
   const subTab = useNavStore((s) => s.overUnderSubTab);
@@ -27,7 +27,14 @@ export function OverUnderTab() {
 
   return (
     <>
-      <SubTabBar
+      <div className="desk-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16M7 16h8M7 11h12M7 6h3"/></svg>
+          <h1 style={{ fontSize: 17, margin: 0, fontWeight: 600 }}>Over / Under</h1>
+        </div>
+      </div>
+
+      <SubTabBar<OverUnderSubTab>
         tabs={[
           { id: "overvalued", label: "Overvalued" },
           { id: "undervalued", label: "Undervalued" },
@@ -39,7 +46,8 @@ export function OverUnderTab() {
         active={subTab}
         onChange={setSubTab}
       />
-      <div className="flex-1 min-h-0 overflow-hidden">
+
+      <div className="flex-1" style={{ minHeight: 0, overflow: "hidden" }}>
         {subTab === "signals" ? (
           <SignalsListView />
         ) : (

@@ -5,12 +5,26 @@ import type { LiquidationEvent } from "@/types/liquidation";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return NextResponse.json(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export async function GET() {
   let events: LiquidationEvent[] = [];
   try {
     events = await fetchLiquidationEvents();
-  } catch {
-    // Serve whatever we have (possibly empty) rather than failing the whole tab.
+  } catch (error) {
+    console.error("[liquidations] Failed to fetch events:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch liquidation events", details: "upstream fetch failed" },
+      { status: 502, headers: CORS_HEADERS }
+    );
   }
 
   return NextResponse.json(
@@ -25,7 +39,8 @@ export async function GET() {
     },
     {
       headers: {
-        "Cache-Control": "public, s-maxage=20, stale-while-revalidate=120",
+        ...CORS_HEADERS,
+        "Cache-Control": "public, s-maxage=20, stale-while-revalidate=100",
       },
     }
   );

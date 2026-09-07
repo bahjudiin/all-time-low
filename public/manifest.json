@@ -4,8 +4,8 @@
   "description": "Real-time All-Time High and All-Time Low tracker with predictive signals",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#3b82f6",
+  "background_color": "#0e1420",
+  "theme_color": "#1668dc",
   "orientation": "any",
   "icons": [
     {

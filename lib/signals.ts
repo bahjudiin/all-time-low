@@ -47,7 +47,6 @@ export function calcDerivativesIndicators(
     topPosition: BinanceLongShortRatio[];
     taker: BinanceLongShortRatio[];
   },
-  priceChange24h: number,
 ): {
   funding: import("@/types/signal").FundingRateResult;
   openInterest: import("@/types/signal").OpenInterestResult;
@@ -95,7 +94,7 @@ export function calcDerivativesIndicators(
   };
 
   const oiCurrent = openInterest ? parseFloat(openInterest.current) : 0;
-  const oiChange24h = oiCurrent > 0 && priceChange24h !== 0 ? priceChange24h : 0;
+  const oiChange24h = 0;
 
   let oiTrend: "increasing" | "decreasing" | "stable" = "stable";
   if (oiChange24h > 0) oiTrend = "increasing";
@@ -200,10 +199,7 @@ export function computeSignals(
   const atr = calcATR(klines);
   const obv = calcOBV(klines);
 
-  const priceChange24h =
-    closes.length >= 2 ? ((closes[closes.length - 1] - closes[closes.length - 2]) / closes[closes.length - 2]) * 100 : 0;
-
-  const derivatives = calcDerivativesIndicators(fundingRates, openInterest, longShortData, priceChange24h);
+  const derivatives = calcDerivativesIndicators(fundingRates, openInterest, longShortData);
 
   let momentumSignal: -1 | 0 | 1 = 0;
   if (rsi.signal === stochRsi.signal && rsi.signal !== 0) {
@@ -364,10 +360,10 @@ export function computeSignals(
   if (score >= 6) direction = "strong_long";
   else if (score >= 4) direction = "long";
   else if (score >= 2) direction = "lean_long";
-  else if (score > -2) direction = "wait";
-  else if (score > -4) direction = "lean_short";
-  else if (score > -6) direction = "short";
-  else direction = "strong_short";
+  else if (score <= -6) direction = "strong_short";
+  else if (score <= -4) direction = "short";
+  else if (score <= -2) direction = "lean_short";
+  else direction = "wait";
 
   const nonZeroGroups = groups.filter((g) => g.signal !== 0);
   let agreementPct = 0;
@@ -408,15 +404,12 @@ function computePriceTargets(
   if (score === 0) return undefined;
 
   const isLong = score > 0;
-  const absScore = Math.abs(score);
 
   // ATR-based extensions
   const atr1x = price + (isLong ? 1 : -1) * atr.value;
-  const atr15x = price + (isLong ? 1 : -1) * atr.value * 1.5;
   const atr2x = price + (isLong ? 1 : -1) * atr.value * 2;
 
   // Bollinger levels
-  const bbTarget = isLong ? bollinger.upper : bollinger.lower;
   const bbStop = isLong ? bollinger.lower : bollinger.upper;
 
   // EMA levels
@@ -440,9 +433,9 @@ function computePriceTargets(
   // ── L2: Moderate (ATR extension + EMA confirmation) ──
   let l2Price: number;
   if (isLong) {
-    l2Price = Math.min(atr15x, Math.max(atr15x, emaTarget));
+    l2Price = Math.min(atr2x, Math.max(atr1x, emaTarget));
   } else {
-    l2Price = Math.max(atr15x, Math.min(atr15x, emaTarget));
+    l2Price = Math.max(atr2x, Math.min(atr1x, emaTarget));
   }
   const l2 = makeLevel(price, l2Price, "ATR 1.5x");
 

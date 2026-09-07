@@ -17,12 +17,6 @@ const smallCurrencyFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 8,
 });
 
-const percentFormatter = new Intl.NumberFormat("en-US", {
-  style: "percent",
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
-
 export function formatUSD(n: number): string {
   if (n < 0.01) return smallCurrencyFormatter.format(n);
   return currencyFormatter.format(n);
@@ -33,7 +27,7 @@ export function formatCompact(n: number): string {
 }
 
 export function formatPercent(n: number): string {
-  const signed = n >= 0 ? `+${(n / 100).toFixed(1)}%` : `${(n / 100).toFixed(1)}%`;
+  const signed = n >= 0 ? `+${n.toFixed(1)}%` : `${n.toFixed(1)}%`;
   return signed;
 }
 

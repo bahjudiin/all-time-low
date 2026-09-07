@@ -1,5 +1,6 @@
 import { COINGECKO_TO_OKX } from "@/lib/okx";
 import { cachedGet } from "@/lib/cache";
+import { fetchJson } from "@/lib/retry";
 import type { LiquidationEvent } from "@/types/liquidation";
 
 const BASE_URL = "https://www.okx.com";
@@ -45,10 +46,18 @@ function sideFromDetail(d: OKXLiqDetail): "long" | "short" | null {
 async function fetchFamily(instId: string, signal?: AbortSignal): Promise<LiquidationEvent[]> {
   const family = toFamily(instId);
   const url = `${BASE_URL}/api/v5/public/liquidation-orders?instType=SWAP&uly=${encodeURIComponent(family)}&state=filled&limit=100`;
-  const response = await fetch(url, { signal });
-  if (!response.ok) return [];
-  const json = (await response.json()) as { code?: string; data?: OKXLiqBatch[] };
-  if (json.code !== "0" || !Array.isArray(json.data)) return [];
+  let json: { code?: string; data?: OKXLiqBatch[] };
+  try {
+    json = await fetchJson<{ code?: string; data?: OKXLiqBatch[] }>(url, { signal, timeoutMs: TIMEOUT_MS });
+  } catch (err) {
+    console.error(`[liquidationHistory] fetchFamily failed for ${instId}`, err instanceof Error ? err.message : err);
+    throw err;
+  }
+  if (json.code !== "0" || !Array.isArray(json.data)) {
+    const msg = `[liquidationHistory] OKX non-zero code ${json.code} for ${instId}`;
+    console.error(msg);
+    throw new Error(msg);
+  }
 
   const events: LiquidationEvent[] = [];
   for (const batch of json.data) {
@@ -79,11 +88,23 @@ async function runPool<T>(items: string[], concurrency: number, worker: (item: s
   const out: T[] = [];
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let total = 0;
+  let failures = 0;
   try {
     for (let i = 0; i < items.length; i += concurrency) {
       const batch = items.slice(i, i + concurrency);
       const results = await Promise.allSettled(batch.map((item) => worker(item, controller.signal)));
-      for (const r of results) if (r.status === "fulfilled") out.push(...r.value);
+      for (const r of results) {
+        total++;
+        if (r.status === "fulfilled") out.push(...r.value);
+        else {
+          failures++;
+          console.error("[liquidationHistory] worker failed", r.reason instanceof Error ? r.reason.message : r.reason);
+        }
+      }
+    }
+    if (total > 0 && failures === total) {
+      throw new Error(`[liquidationHistory] all ${total} family fetches failed`);
     }
     return out;
   } finally {

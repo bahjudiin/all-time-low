@@ -11,11 +11,13 @@ export const revalidate = 60;
 
 export default async function Home() {
   let coins: Awaited<ReturnType<typeof fetchCoinsMarkets>> = [];
+  let fetchError = false;
   try {
     coins = await fetchCoinsMarkets("usd", 250, 1);
   } catch (e) {
     console.error("Failed to fetch coins:", e);
+    fetchError = true;
   }
 
-  return <AppShell initialCoins={coins} />;
+  return <AppShell initialCoins={coins} fetchError={fetchError} />;
 }

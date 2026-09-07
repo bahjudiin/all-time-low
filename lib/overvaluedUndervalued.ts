@@ -10,10 +10,16 @@ import { calcRSI, calcBollinger, calcATR } from "@/lib/indicators";
 
 function ema(values: number[], period: number): number[] {
   const k = 2 / (period + 1);
-  const result: number[] = [values[0]];
-  for (let i = 1; i < values.length; i++) {
-    if (isNaN(result[i - 1])) {
-      result.push(values[i]);
+  const result: number[] = [];
+  for (let i = 0; i < values.length; i++) {
+    if (isNaN(values[i])) {
+      result.push(result[i - 1] ?? NaN);
+    } else if (i < period - 1) {
+      result.push(NaN);
+    } else if (i === period - 1) {
+      let sum = 0;
+      for (let j = 0; j < period; j++) sum += isNaN(values[j]) ? 0 : values[j];
+      result.push(sum / period);
     } else {
       result.push(values[i] * k + result[i - 1] * (1 - k));
     }
@@ -111,8 +117,8 @@ function computeFairValueDeviation(
   const closes1h = klines1h.map((k) => k.close);
   const ema50 = ema(closes1h, 50);
   const ema200 = ema(closes1h, 200);
-  const ema50Val = ema50[ema50.length - 1];
-  const ema200Val = ema200[ema200.length - 1];
+  const ema50Val = klines1h.length >= 50 ? ema50[ema50.length - 1] : NaN;
+  const ema200Val = klines1h.length >= 200 ? ema200[ema200.length - 1] : NaN;
 
   const vwap24h = klines1h.length >= 24
     ? calcVWAP(klines1h.slice(-24))
@@ -176,7 +182,6 @@ function computeMomentum(
   let score = 0;
   if (direction === 1) {
     // Overbought range 50-100
-    const overboughtLevel = 70;
     const extremeLevel = 80;
     score = clamp(((weighted - 50) / (extremeLevel - 50)) * 100, 0, 100);
     // Timeframe agreement bonus
@@ -184,7 +189,6 @@ function computeMomentum(
     if (tfAgree >= 2) score = clamp(score + 10, 0, 100);
     if (tfAgree >= 3) score = clamp(score + 5, 0, 100);
   } else {
-    const oversoldLevel = 30;
     const extremeLevel = 20;
     score = clamp(((50 - weighted) / (50 - extremeLevel)) * 100, 0, 100);
     const tfAgree = [rsi15m, rsi1h, rsi4h].filter((r) => r < 35).length;
@@ -215,9 +219,7 @@ interface CrowdingFactor {
 }
 
 function computeFuturesCrowding(
-  currentPrice: number,
   fundingRates: BinanceFundingRate[],
-  openInterest: BinanceOpenInterest | null,
   longShort: OvervaluedUndervaluedInput["longShort"],
   priceChange1hPct: number,
 ): CrowdingFactor {
@@ -225,12 +227,7 @@ function computeFuturesCrowding(
   const rates30d = fundingRates.slice(-90).map((f) => f.fundingRate);
   const fundingPct = percentile(currentRate, rates30d);
 
-  let oiChange1h = 0;
-  if (openInterest && openInterest.current) {
-    const oiNow = parseFloat(openInterest.current);
-    // Use price change as proxy for OI delta without historical OI sample
-    oiChange1h = oiNow > 0 ? priceChange1hPct : 0;
-  }
+  const oiChange1h = 0;
 
   const globalRatio = longShort.global.length > 0
     ? parseFloat(longShort.global[longShort.global.length - 1].longShortRatio)
@@ -561,12 +558,13 @@ function computeReversalContinuation(
     factors.fairValue.direction === direction ? factors.fairValue.score * 0.9 : 0,
     factors.momentum.direction === direction ? factors.momentum.score : 0,
     factors.crowding.direction === direction ? factors.crowding.score : 0,
+    factors.volume.direction === direction ? factors.volume.score : 0,
     factors.structure.direction === direction ? factors.structure.score : 0,
     factors.volatility.direction === direction ? factors.volatility.score : 0,
     factors.liquidation.direction === direction ? factors.liquidation.score * 0.8 : 0,
   ];
 
-  const weightedAgree = groupsAgreeing.reduce((a, b) => a + b, 0) / 6;
+  const weightedAgree = groupsAgreeing.reduce((a, b) => a + b, 0) / groupsAgreeing.length;
 
   // Regime adjustment
   let regimeAdj = 0;
@@ -632,9 +630,7 @@ function computeEntry(
   const atr = Math.max(currentPrice * (factors.volatility.atrNormalized / 100), currentPrice * 0.002);
 
   // Entry projected as continuation of the stretch by ATR-multiple
-  const extensionMultiplier = direction === 1
-    ? clamp(0.8 + (factors.fairValue.score / 100) * 1.2, 0.8, 2.0)
-    : clamp(0.8 + (factors.fairValue.score / 100) * 1.2, 0.8, 2.0);
+  const extensionMultiplier = clamp(0.8 + (factors.fairValue.score / 100) * 1.2, 0.8, 2.0);
 
   let predictedEntry: number;
   if (direction === 1) {
@@ -815,9 +811,7 @@ export function computeOvervaluedUndervalued(
   const fairValue = computeFairValueDeviation(currentPrice, input.klines15m, input.klines1h);
   const momentum = computeMomentum(input.klines15m, input.klines1h, input.klines4h);
   const crowding = computeFuturesCrowding(
-    currentPrice,
     input.fundingRates,
-    input.openInterest,
     input.longShort,
     priceChange1hPct,
   );
@@ -915,8 +909,8 @@ export function computeOvervaluedUndervalued(
     image: input.image,
     currentPrice: round(currentPrice),
     direction,
-    overvaluationScore: round(direction === "overvalued" ? valuationScore : Math.max(0, Math.min(100, valuationScore))),
-    undervaluationScore: round(direction === "undervalued" ? valuationScore : 0),
+    overvaluationScore: round(direction === "overvalued" ? valuationScore : direction === "undervalued" ? 100 - valuationScore : 0),
+    undervaluationScore: round(direction === "undervalued" ? valuationScore : direction === "overvalued" ? 100 - valuationScore : 0),
     reversalProbability,
     continuationProbability,
     confidence: round(rawConfidence),

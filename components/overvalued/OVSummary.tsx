@@ -4,9 +4,10 @@ import type { OvervaluedUndervaluedResult } from "@/lib/overvaluedUndervalued";
 
 interface OVSummaryProps {
   results: OvervaluedUndervaluedResult[];
+  loading?: boolean;
 }
 
-export function OVSummary({ results }: OVSummaryProps) {
+export function OVSummary({ results, loading = false }: OVSummaryProps) {
   const total = results.length;
   const overvalued = results.filter((r) => r.direction === "overvalued").length;
   const undervalued = results.filter((r) => r.direction === "undervalued").length;
@@ -16,21 +17,21 @@ export function OVSummary({ results }: OVSummaryProps) {
   const avgConfidence = total > 0 ? Math.round(results.reduce((a, b) => a + b.finalConfidence, 0) / total) : 0;
 
   const cards = [
-    { label: "Overvalued", value: overvalued, color: "text-red-400", sub: `${total} scanned` },
-    { label: "Undervalued", value: undervalued, color: "text-emerald-400", sub: `${total} scanned` },
-    { label: "Extreme", value: extreme, color: "text-amber-400", sub: "≥85 valuation" },
-    { label: "Entry Near", value: entryNear, color: "text-blue-400", sub: "approaching zone" },
-    { label: "Best Opp", value: best ? best.opportunityScore : 0, color: "text-purple-400", sub: best ? `${best.symbol}` : "—" },
-    { label: "Avg Conf", value: avgConfidence, color: "text-zinc-300", sub: `${total} signals` },
+    { label: "Overvalued", value: overvalued, color: "short", sub: `${total} scanned` },
+    { label: "Undervalued", value: undervalued, color: "long", sub: `${total} scanned` },
+    { label: "Extreme", value: extreme, color: "amber", sub: "≥85 valuation" },
+    { label: "Entry Near", value: entryNear, color: "cyan", sub: "approaching zone" },
+    { label: "Best Opp", value: best ? Math.round(best.opportunityScore) : 0, color: "violet", sub: best ? `${best.symbol}` : "—" },
+    { label: "Avg Conf", value: avgConfidence, color: "", sub: `${total} signals` },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 px-6 py-3">
+    <div className="breadth-row" style={{ marginBottom: 14 }}>
       {cards.map((c) => (
-        <div key={c.label} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
-          <div className="text-[10px] text-zinc-500 uppercase tracking-wider">{c.label}</div>
-          <div className={`text-xl font-bold mt-1 ${c.color}`}>{c.value}</div>
-          <div className="text-[10px] text-zinc-600 mt-0.5">{c.sub}</div>
+        <div key={c.label} className="breadth-cell">
+          <div className="lbl">{c.label}</div>
+          <div className={`val ${c.color}`}>{loading ? "…" : c.value}</div>
+          <div style={{ color: "var(--muted2)", fontSize: 9, marginTop: 2 }}>{loading ? "fetching…" : c.sub}</div>
         </div>
       ))}
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useRef, useState, useCallback } from "react";
 
 export function Tooltip({
   label,
@@ -14,22 +14,77 @@ export function Tooltip({
   className?: string;
 }) {
   const id = useId();
-  const pos: Record<string, string> = {
-    top: "bottom-full left-1/2 -translate-x-1/2 mb-1.5",
-    bottom: "top-full left-1/2 -translate-x-1/2 mt-1.5",
-    left: "right-full top-1/2 -translate-y-1/2 mr-1.5",
-    right: "left-full top-1/2 -translate-y-1/2 ml-1.5",
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [style, setStyle] = useState<React.CSSProperties>({});
+
+  const show = useCallback(() => {
+    setVisible(true);
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const tipStyle: React.CSSProperties = {};
+    if (side === "top" || side === "bottom") {
+      const left = rect.left + rect.width / 2;
+      const clampedLeft = Math.max(8, Math.min(left, window.innerWidth - 8));
+      tipStyle.left = clampedLeft;
+      tipStyle.transform = "translateX(-50%)";
+    } else {
+      const top = rect.top + rect.height / 2;
+      const clampedTop = Math.max(8, Math.min(top, window.innerHeight - 8));
+      tipStyle.top = clampedTop;
+      tipStyle.transform = "translateY(-50%)";
+    }
+    setStyle(tipStyle);
+  }, [side]);
+
+  if (!label) return <span className={className}>{children}</span>;
+
+  const pos: Record<string, React.CSSProperties> = {
+    top: { bottom: "100%", left: "50%", transform: "translateX(-50%)", marginBottom: 6 },
+    bottom: { top: "100%", left: "50%", transform: "translateX(-50%)", marginTop: 6 },
+    left: { right: "100%", top: "50%", transform: "translateY(-50%)", marginRight: 6 },
+    right: { left: "100%", top: "50%", transform: "translateY(-50%)", marginLeft: 6 },
   };
+
   return (
-    <span className={`relative inline-flex group ${className}`}>
+    <span
+      ref={triggerRef}
+      className={className}
+      style={{ position: "relative", display: "inline-flex" }}
+      onMouseEnter={show}
+      onMouseLeave={() => setVisible(false)}
+      onFocus={show}
+      onBlur={() => setVisible(false)}
+      aria-describedby={id}
+    >
       {children}
-      <span
-        role="tooltip"
-        aria-describedby={id}
-        className={`absolute ${pos[side]} z-50 hidden group-hover:inline-flex whitespace-nowrap px-2 py-1 text-[11px] leading-tight font-normal text-zinc-100 bg-zinc-900 dark:bg-zinc-700 rounded-md shadow-lg border border-zinc-700 dark:border-zinc-600 pointer-events-none max-w-[240px]`}
-      >
-        {label}
-      </span>
+      {visible && (
+        <span
+          id={id}
+          role="tooltip"
+          className="mono"
+          style={{
+            position: "absolute",
+            zIndex: 50,
+            whiteSpace: "nowrap",
+            padding: "4px 8px",
+            fontSize: 10,
+            lineHeight: 1.3,
+            color: "var(--ink-primary)",
+            background: "var(--panel-raised)",
+            borderRadius: 2,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            border: "1px solid var(--hair)",
+            pointerEvents: "none",
+            maxWidth: 240,
+            ...pos[side],
+            ...style,
+          }}
+        >
+          {label}
+        </span>
+      )}
     </span>
   );
 }

@@ -5,43 +5,77 @@ import {
   SWEEP_MIN_EVENTS,
 } from "@/types/liquidation";
 
+function priceBandOk(aPrice: number, bPrice: number): boolean {
+  const base = aPrice > 0 ? aPrice : bPrice;
+  if (base <= 0) return false;
+  return Math.abs((bPrice - aPrice) / base) * 100 <= SWEEP_PRICE_BAND_PCT;
+}
+
 export function detectSweeps(events: LiquidationEvent[]): SweepRecord[] {
-  const sorted = [...events].sort((a, b) =>
-    a.symbol.localeCompare(b.symbol) || a.ts - b.ts,
-  );
+  const byKey = new Map<string, LiquidationEvent[]>();
+  for (const e of events) {
+    const key = `${e.symbol}:${e.side}`;
+    const arr = byKey.get(key) ?? [];
+    arr.push(e);
+    byKey.set(key, arr);
+  }
 
   const sweeps: SweepRecord[] = [];
+  let sweepSeq = 0;
 
-  let i = 0;
-  while (i < sorted.length) {
-    const group: LiquidationEvent[] = [sorted[i]];
-    const first = sorted[i];
-    i++;
+  for (const slice of byKey.values()) {
+    slice.sort((a, b) => a.ts - b.ts);
+    const open: { symbol: string; side: "long" | "short"; members: LiquidationEvent[] }[] = [];
+    const closed: { symbol: string; side: "long" | "short"; members: LiquidationEvent[] }[] = [];
 
-    while (i < sorted.length) {
-      const next = sorted[i];
-      if (
-        next.symbol !== first.symbol ||
-        next.side !== first.side ||
-        next.ts - first.ts > SWEEP_WINDOW_MS ||
-        Math.abs((next.price - first.price) / first.price) * 100 >
-          SWEEP_PRICE_BAND_PCT
-      ) {
-        break;
+    for (const e of slice) {
+      let target: (typeof open)[number] | null = null;
+      let bestDist = Infinity;
+      for (const group of open) {
+        const last = group.members[group.members.length - 1];
+        if (last.ts + SWEEP_WINDOW_MS < e.ts) continue;
+        for (let mi = group.members.length - 1; mi >= 0; mi--) {
+          const m = group.members[mi];
+          if (m.ts + SWEEP_WINDOW_MS < e.ts) break;
+          if (priceBandOk(m.price, e.price)) {
+            const dist = e.ts - last.ts;
+            if (dist < bestDist) {
+              bestDist = dist;
+              target = group;
+            }
+            break;
+          }
+        }
       }
-      group.push(next);
-      i++;
+
+      if (target) {
+        target.members.push(e);
+      } else {
+        open.push({ symbol: e.symbol, side: e.side, members: [e] });
+      }
+
+      for (let s = open.length - 1; s >= 0; s--) {
+        const last = open[s].members[open[s].members.length - 1];
+        if (last.ts + SWEEP_WINDOW_MS < e.ts) {
+          closed.push(open[s]);
+          open.splice(s, 1);
+        }
+      }
     }
 
-    if (group.length >= SWEEP_MIN_EVENTS) {
-      const firstEvt = group[0];
-      const lastEvt = group[group.length - 1];
+    closed.push(...open);
+
+    for (const { symbol, side, members } of closed) {
+      if (members.length < SWEEP_MIN_EVENTS) continue;
+      const firstEvt = members[0];
+      const lastEvt = members[members.length - 1];
+      sweepSeq++;
       sweeps.push({
-        id: `sweep-${firstEvt.symbol}-${firstEvt.side}-${firstEvt.ts}`,
-        symbol: firstEvt.symbol,
-        side: firstEvt.side,
-        totalUsd: group.reduce((sum, e) => sum + e.usdValue, 0),
-        count: group.length,
+        id: `sweep-${symbol}-${side}-${sweepSeq}`,
+        symbol,
+        side,
+        totalUsd: members.reduce((sum, e) => sum + e.usdValue, 0),
+        count: members.length,
         priceStart: firstEvt.price,
         priceEnd: lastEvt.price,
         priceMove:

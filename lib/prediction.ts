@@ -1,6 +1,5 @@
 import type {
   BinanceKline,
-  BinanceFundingRate,
   BinanceLongShortRatio,
 } from "@/types/signal";
 import type {
@@ -25,26 +24,18 @@ import type {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function sma(values: number[], period: number): number[] {
-  const result: number[] = [];
-  for (let i = 0; i < values.length; i++) {
-    if (i < period - 1) {
-      result.push(NaN);
-    } else {
-      let sum = 0;
-      for (let j = i - period + 1; j <= i; j++) sum += values[j];
-      result.push(sum / period);
-    }
-  }
-  return result;
-}
-
 function ema(values: number[], period: number): number[] {
   const k = 2 / (period + 1);
-  const result: number[] = [values[0]];
-  for (let i = 1; i < values.length; i++) {
-    if (isNaN(result[i - 1])) {
-      result.push(values[i]);
+  const result: number[] = [];
+  for (let i = 0; i < values.length; i++) {
+    if (isNaN(values[i])) {
+      result.push(result[i - 1] ?? NaN);
+    } else if (i < period - 1) {
+      result.push(NaN);
+    } else if (i === period - 1) {
+      let sum = 0;
+      for (let j = 0; j < period; j++) sum += isNaN(values[j]) ? 0 : values[j];
+      result.push(sum / period);
     } else {
       result.push(values[i] * k + result[i - 1] * (1 - k));
     }
@@ -113,6 +104,31 @@ function calcRSI(closes: number[], period: number = 14): number {
   return 100 - 100 / (1 + rs);
 }
 
+function calcRSISeries(closes: number[], period: number = 14): number[] {
+  const result: number[] = [];
+  if (closes.length < period + 1) {
+    for (let i = 0; i < closes.length; i++) result.push(50);
+    return result;
+  }
+  let gains = 0;
+  let losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) gains += diff;
+    else losses -= diff;
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    avgGain = (avgGain * (period - 1) + (diff > 0 ? diff : 0)) / period;
+    avgLoss = (avgLoss * (period - 1) + (diff < 0 ? -diff : 0)) / period;
+    result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
+  }
+  return result;
+}
+
 // ── VWAP Calculation ────────────────────────────────────────────────
 
 function calcVWAP(klines: BinanceKline[]): number {
@@ -130,7 +146,6 @@ function calcVWAP(klines: BinanceKline[]): number {
 
 function analyzePriceExtension(
   klines: BinanceKline[],
-  currentPrice: number,
 ): PriceExtension {
   const closes = klines.map((k) => k.close);
   const last = closes[closes.length - 1];
@@ -151,9 +166,12 @@ function analyzePriceExtension(
   const moveFromLocalHigh = localHigh === 0 ? 0 : ((last - localHigh) / localHigh) * 100;
 
   const returns: number[] = [];
-  for (let i = 1; i < Math.min(100, closes.length); i++) {
-    if (closes[closes.length - 1 - i - 1]) {
-      returns.push(Math.abs(((closes[closes.length - 1 - i] - closes[closes.length - 1 - i - 1]) / closes[closes.length - 1 - i - 1]) * 100));
+  const maxI = Math.min(100, closes.length);
+  for (let i = 1; i < maxI; i++) {
+    const idx = closes.length - 1 - i;
+    const prevIdx = idx - 1;
+    if (prevIdx >= 0 && closes[prevIdx]) {
+      returns.push(Math.abs(((closes[idx] - closes[prevIdx]) / closes[prevIdx]) * 100));
     }
   }
   const sortedReturns = [...returns].sort((a, b) => a - b);
@@ -187,7 +205,10 @@ function analyzeVolatility(klines: BinanceKline[], currentPrice: number): Volati
   const atrNormalized = currentPrice === 0 ? 0 : (atr / currentPrice) * 100;
 
   const recentATR = atrValues.slice(-20);
-  const avgATR = recentATR.reduce((a, b) => a + (isNaN(b) ? 0 : b), 0) / recentATR.filter((v) => !isNaN(v)).length || 1;
+  const validATR = recentATR.filter((v) => !isNaN(v));
+  const avgATR = validATR.length > 0
+    ? validATR.reduce((a, b) => a + b, 0) / validATR.length
+    : 1;
   const atrExpansion = avgATR === 0 ? 1 : atr / avgATR;
 
   const ranges = klines.slice(-20).map((k) => k.high - k.low);
@@ -223,40 +244,34 @@ function analyzeMomentum(klines: BinanceKline[]): MomentumAnalysis {
   const rsi = calcRSI(closes);
   const rsiExtreme = rsi > 75 || rsi < 25;
 
-  const rsiValues: number[] = [];
-  for (let i = Math.max(28, closes.length - 30); i < closes.length; i++) {
-    rsiValues.push(calcRSI(closes.slice(0, i + 1)));
-  }
+  const rsiFull = calcRSISeries(closes, 14);
+
   let rsiAcceleration = 0;
   let rsiDeceleration = false;
-  if (rsiValues.length >= 6) {
-    const recentSlope = (rsiValues[rsiValues.length - 1] - rsiValues[rsiValues.length - 3]) / 2;
-    const priorSlope = (rsiValues[rsiValues.length - 3] - rsiValues[rsiValues.length - 6]) / 3;
+  if (rsiFull.length >= 6) {
+    const recentSlope = (rsiFull[rsiFull.length - 1] - rsiFull[rsiFull.length - 3]) / 2;
+    const priorSlope = (rsiFull[rsiFull.length - 3] - rsiFull[rsiFull.length - 6]) / 3;
     rsiAcceleration = recentSlope - priorSlope;
     rsiDeceleration = Math.abs(recentSlope) < Math.abs(priorSlope) * 0.6 && Math.abs(priorSlope) > 0.5;
   }
 
-  const rsiFull: number[] = [];
-  for (let i = 14; i < closes.length; i++) {
-    rsiFull.push(calcRSI(closes.slice(0, i + 1)));
-  }
   let stochRsiK = 50;
   let stochRsiD = 50;
-  if (rsiFull.length >= 14) {
-    const window = rsiFull.slice(-14);
-    const min = Math.min(...window);
-    const max = Math.max(...window);
-    const range = max - min;
-    stochRsiK = range === 0 ? 50 : ((rsiFull[rsiFull.length - 1] - min) / range) * 100;
-    const kValues: number[] = [];
-    for (let i = Math.max(0, rsiFull.length - 14); i < rsiFull.length; i++) {
-      const w = rsiFull.slice(Math.max(0, i - 13), i + 1);
-      const mn = Math.min(...w);
-      const mx = Math.max(...w);
-      const r = mx - mn;
-      kValues.push(r === 0 ? 50 : ((rsiFull[i] - mn) / r) * 100);
+  const kSeries: number[] = [];
+  for (let i = 13; i < rsiFull.length; i++) {
+    const w = rsiFull.slice(Math.max(0, i - 13), i + 1);
+    const mn = Math.min(...w);
+    const mx = Math.max(...w);
+    const r = mx - mn;
+    kSeries.push(r === 0 ? 50 : ((rsiFull[i] - mn) / r) * 100);
+  }
+  if (kSeries.length > 0) {
+    stochRsiK = kSeries[kSeries.length - 1];
+    if (kSeries.length >= 3) {
+      stochRsiD = (kSeries[kSeries.length - 1] + kSeries[kSeries.length - 2] + kSeries[kSeries.length - 3]) / 3;
+    } else {
+      stochRsiD = stochRsiK;
     }
-    stochRsiD = kValues.reduce((a, b) => a + b, 0) / kValues.length;
   }
 
   const rateOfChange = closes.length >= 6
@@ -469,7 +484,7 @@ export function computeExhaustionFactors(
   hasLiqData: boolean,
 ): ExhaustionFactors {
   return {
-    priceExtension: analyzePriceExtension(klines, currentPrice),
+    priceExtension: analyzePriceExtension(klines),
     volatility: analyzeVolatility(klines, currentPrice),
     momentum: analyzeMomentum(klines),
     volume: analyzeVolume(klines),
@@ -692,7 +707,6 @@ function computeConfluenceScore(
   // Classify clusters by their vote relative to our direction
   const agreeing = clusters.filter((c) => c.vote === expectedVote);
   const conflicting = clusters.filter((c) => c.vote !== 0 && c.vote !== expectedVote);
-  const neutral = clusters.filter((c) => c.vote === 0);
 
   // Weighted confluence: only agreeing clusters contribute
   let agreeingWeight = 0;
@@ -710,14 +724,6 @@ function computeConfluenceScore(
   let exhaustion = maxPossibleWeight > 0
     ? Math.round((agreeingWeight / maxPossibleWeight) * 100)
     : 0;
-
-  // CONFLICT PENALTY: each conflicting cluster reduces the score
-  const conflictPenalty = conflicting.length * 12;
-  exhaustion = Math.max(0, exhaustion - conflictPenalty);
-
-  // NEUTRAL PENALTY: neutral clusters slightly reduce confidence (they don't confirm)
-  const neutralPenalty = neutral.length * 3;
-  exhaustion = Math.max(0, exhaustion - neutralPenalty);
 
   // MINIMUM CONFLUENCE GATE: need at least 2 agreeing clusters for any meaningful signal
   if (agreeing.length < 2) {
@@ -801,21 +807,15 @@ function isFakeSignal(
 
 // ── Main Probability Calculation ────────────────────────────────────
 
-function computeProbabilities(factors: ExhaustionFactors, direction: PredictionDirection): {
+function computeProbabilities(
+  factors: ExhaustionFactors,
+  direction: PredictionDirection,
+  clusters: ClusterVote[],
+): {
   continuation: number;
   exhaustion: number;
   zoneReach: number;
 } {
-  // Build all cluster votes
-  const clusters: ClusterVote[] = [
-    evaluateExtensionCluster(factors),
-    evaluateVolatilityCluster(factors),
-    evaluateMomentumCluster(factors, direction),
-    evaluateVolumeCluster(factors, direction),
-    evaluateFlowCluster(factors, direction),
-    evaluateStructureCluster(factors, direction),
-  ];
-
   const result = computeConfluenceScore(clusters, direction, factors);
 
   // Apply fake signal filter
@@ -925,7 +925,7 @@ function determineState(
   return "normal";
 }
 
-function determineDirection(factors: ExhaustionFactors, _currentPrice: number): PredictionDirection {
+function determineDirection(factors: ExhaustionFactors): PredictionDirection {
   const pe = factors.priceExtension;
 
   if (pe.ret1h > 1 || pe.moveFromLocalLow > 3) return "SHORT";
@@ -934,7 +934,7 @@ function determineDirection(factors: ExhaustionFactors, _currentPrice: number): 
   if (factors.momentum.rsi > 65) return "SHORT";
   if (factors.momentum.rsi < 35) return "LONG";
 
-  return "SHORT";
+  return factors.momentum.rsi > 50 ? "SHORT" : "LONG";
 }
 
 function determineQuality(
@@ -970,7 +970,6 @@ function determineQuality(
 function determineApproachState(
   currentPrice: number,
   zone: PredictionZone,
-  _atr: number,
 ): ApproachState {
   const zoneMid = (zone.upper + zone.lower) / 2;
   const zoneWidth = zone.upper - zone.lower;
@@ -1023,7 +1022,7 @@ function identifyFactors(
     if (factors.orderFlow.available && factors.orderFlow.weakeningAggression) supporting.push("Aggressive buying weakening");
     if (pe.extensionPercentile > 80) supporting.push(`Extension at ${pe.extensionPercentile}th percentile`);
   } else {
-    if (Math.abs(pe.ret1h) < -5) supporting.push(`Strong ${pe.ret1h.toFixed(1)}% decline`);
+    if (pe.ret1h < -5) supporting.push(`Strong ${pe.ret1h.toFixed(1)}% decline`);
     if (pe.abnormalMove) supporting.push("Abnormal price move detected");
     if (ma.rsi < 30) supporting.push(`RSI oversold at ${ma.rsi.toFixed(0)}`);
     if (ma.rsiDeceleration) supporting.push("RSI selling momentum decelerating");
@@ -1076,7 +1075,7 @@ export function computePrediction(
   const factors = computeExhaustionFactors(klines, currentPrice, takerRatio, hasLiqData);
 
   // Determine direction FIRST (needed by momentum/volume/flow/structure clusters)
-  const direction = determineDirection(factors, currentPrice);
+  const direction = determineDirection(factors);
 
   // Build all cluster votes
   const clusters: ClusterVote[] = [
@@ -1092,11 +1091,11 @@ export function computePrediction(
   const agreeingClusters = clusters.filter((c) => c.vote === expectedVote).length;
   const conflictingClusters = clusters.filter((c) => c.vote !== 0 && c.vote !== expectedVote).length;
 
-  const probs = computeProbabilities(factors, direction);
+  const probs = computeProbabilities(factors, direction, clusters);
   const { zone, levels, invalidation, projectedMove, expectedReversal } = predictZone(currentPrice, direction, factors);
   const state = determineState(factors, probs.exhaustion, currentPrice, zone);
   const quality = determineQuality(factors, probs.exhaustion, agreeingClusters, conflictingClusters);
-  const approachState = determineApproachState(currentPrice, zone, factors.volatility.atr);
+  const approachState = determineApproachState(currentPrice, zone);
 
   const distanceToZone = direction === "SHORT"
     ? zone.lower - currentPrice

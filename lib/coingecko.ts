@@ -1,9 +1,12 @@
 import type { CoinMarket, LiquidationData } from "@/types/coin";
+import { COINGECKO_TO_BINANCE } from "@/lib/binance";
+import { fetchJson } from "@/lib/retry";
 
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
 const BINANCE_BASE = "https://api.binance.com";
 
 const TIMEOUT_MS = 15000;
+const TICKER_BATCH_SIZE = 90;
 
 const EXTRA_BINANCE_COINS = [
   // Meme coins
@@ -26,7 +29,7 @@ const EXTRA_BINANCE_COINS = [
   "sushiswap", "pancakeswap-token", "gmx", "jupiter-exchange-solana",
   "pendle", "dydx", "synthetix-network-token", "lido-dao", "rocket-pool",
   "raydium", "orca", "mango-markets", "drift-protocol", "jito-governance-token",
-  "jup", "ethena", "morpho", "venice-token", "aerodrome-finance",
+  "jup", "morpho", "venice-token", "aerodrome-finance",
   // Gaming & Metaverse
   "the-sandbox", "decentraland", "axie-infinity", "gala", "illuvium",
   "echain-ecology", "beam-2", "ronin", "immutable-x", "enjincoin",
@@ -34,18 +37,18 @@ const EXTRA_BINANCE_COINS = [
   "ultraviolet", "ron", "pixel-2", "pixels", "portal",
   // Layer 2 & Infrastructure
   "arbitrum", "optimism", "starknet", "mantle", "matic-network",
-  "polygon-ecosystem-token", "immutable-x", "metis-token", "boba-network",
+  "polygon-ecosystem-token", "metis-token", "boba-network",
   "celo", "layerzero", "wormhole", "stargate-finance", "celestia",
   "dymension", "manta-network", "alt-layer", "scroll", "zksync",
   "blast", "mode", "bob-network", "degen-base-eth", "apex-token-2",
   // DePIN & Storage
   "filecoin", "arweave", "helium", "livepeer", "the-graph",
-  "akash-network", "flux-2", "siacoin", "storj", "secret",
+  "flux-2", "siacoin", "storj", "secret",
   "oasis-network", "ankr", "theta-token", "vet", "hedera-hashgraph",
   // Real World & Payments
   "ripple", "stellar", "nano", "monero", "zcash", "dash",
   "bitcoin-cash", "litecoin", "algorand", "vechain", "iota",
-  "the-open-network", "kaia", "ether-fi", "ethena",
+  "the-open-network", "kaia", "ether-fi",
   // New & Trending
   "grass", "pudgy-penguins", "official-trump", "bittensor", "hyperliquid",
   "pi-network", "sky", "spx6900", "fartcoin", "syrup",
@@ -53,74 +56,86 @@ const EXTRA_BINANCE_COINS = [
   "ordi", "sats", "1000sats", "stx", "runes",
   "sei-network", "sui", "aptos", "injective-protocol",
   "fantom", "near", "cosmos", "chainlink", "avalanche-2",
-  // Additional RWA
-  "centrifuge", "polymesh", "mantra", "reserve-rights-token",
-  "goldfinch", "maple-finance", "tangible", "realio-network",
 ];
 
+type BinanceTicker = {
+  symbol: string;
+  lastPrice: string;
+  priceChangePercent: string;
+  quoteVolume: string;
+};
+
+function coingeckoIdToBinanceSymbol(id: string): string {
+  const mapped = COINGECKO_TO_BINANCE[id];
+  if (mapped) return mapped;
+  return `${id.replace(/-/g, "").toUpperCase()}USDT`;
+}
+
+function applyTicker(
+  map: Map<string, { price: number; change24h: number; volume: number }>,
+  t: BinanceTicker
+): void {
+  if (!t.symbol.endsWith("USDT")) return;
+  const base = t.symbol.replace("USDT", "").toLowerCase();
+  map.set(base, {
+    price: parseFloat(t.lastPrice),
+    change24h: parseFloat(t.priceChangePercent),
+    volume: parseFloat(t.quoteVolume),
+  });
+}
+
 export async function fetchBinanceSymbols(): Promise<string[]> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const data = await fetchJson<{ symbols: Array<{ quoteAsset: string; status: string; baseAsset: string }> }>(
+    `${BINANCE_BASE}/api/v3/exchangeInfo`,
+    { headers: { Accept: "application/json" }, timeoutMs: TIMEOUT_MS }
+  );
+  const symbols: string[] = data.symbols
+    .filter((s) => s.quoteAsset === "USDT" && s.status === "TRADING")
+    .map((s) => s.baseAsset.toLowerCase());
 
-  try {
-    const res = await fetch(`${BINANCE_BASE}/api/v3/exchangeInfo`, {
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      throw new Error(`Binance API error: ${res.status}`);
-    }
-
-    const data = await res.json();
-    const symbols: string[] = data.symbols
-      .filter((s: { quoteAsset: string; status: string }) => s.quoteAsset === "USDT" && s.status === "TRADING")
-      .map((s: { baseAsset: string }) => s.baseAsset.toLowerCase());
-
-    return [...new Set(symbols)];
-  } finally {
-    clearTimeout(timeout);
-  }
+  return [...new Set(symbols)];
 }
 
 export async function fetchBinance24hTicker(): Promise<Map<string, { price: number; change24h: number; volume: number }>> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const needed = new Set<string>();
+  for (const id of EXTRA_BINANCE_COINS) needed.add(coingeckoIdToBinanceSymbol(id));
+  for (const id of Object.keys(COINGECKO_TO_BINANCE)) {
+    const mapped = COINGECKO_TO_BINANCE[id];
+    if (mapped) needed.add(mapped);
+  }
 
-  try {
-    const res = await fetch(`${BINANCE_BASE}/api/v3/ticker/24hr`, {
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
+  const symbols = [...needed];
+  const tickerMap = new Map<string, { price: number; change24h: number; volume: number }>();
 
-    if (!res.ok) {
-      throw new Error(`Binance ticker error: ${res.status}`);
+  const fetchBatch = (batch: string[]) =>
+    fetchJson<BinanceTicker[]>(
+      `${BINANCE_BASE}/api/v3/ticker/24hr?symbols=${encodeURIComponent(JSON.stringify(batch))}`,
+      { headers: { Accept: "application/json" }, timeoutMs: TIMEOUT_MS }
+    );
+
+  for (let i = 0; i < symbols.length; i += TICKER_BATCH_SIZE) {
+    const batch = symbols.slice(i, i + TICKER_BATCH_SIZE);
+    let rows: BinanceTicker[] | null = null;
+    try {
+      rows = await fetchBatch(batch);
+    } catch {
+      rows = null;
     }
-
-    const data: Array<{
-      symbol: string;
-      lastPrice: string;
-      priceChangePercent: string;
-      quoteVolume: string;
-    }> = await res.json();
-
-    const tickerMap = new Map<string, { price: number; change24h: number; volume: number }>();
-
-    for (const t of data) {
-      if (t.symbol.endsWith("USDT")) {
-        const base = t.symbol.replace("USDT", "").toLowerCase();
-        tickerMap.set(base, {
-          price: parseFloat(t.lastPrice),
-          change24h: parseFloat(t.priceChangePercent),
-          volume: parseFloat(t.quoteVolume),
-        });
+    if (rows) {
+      for (const t of rows) applyTicker(tickerMap, t);
+      continue;
+    }
+    for (const sym of batch) {
+      try {
+        const one = await fetchBatch([sym]);
+        for (const t of one) applyTicker(tickerMap, t);
+      } catch {
+        // symbol not tradeable on Binance spot; skip.
       }
     }
-
-    return tickerMap;
-  } finally {
-    clearTimeout(timeout);
   }
+
+  return tickerMap;
 }
 
 export async function fetchCoinsMarkets(
@@ -137,24 +152,11 @@ export async function fetchCoinsMarkets(
     price_change_percentage: "24h,7d,30d",
   });
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-  try {
-    const res = await fetch(`${COINGECKO_BASE}/coins/markets?${params}`, {
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-      next: { revalidate: 60 },
-    });
-
-    if (!res.ok) {
-      throw new Error(`CoinGecko API error: ${res.status}`);
-    }
-
-    return res.json();
-  } finally {
-    clearTimeout(timeout);
-  }
+  return fetchJson<CoinMarket[]>(`${COINGECKO_BASE}/coins/markets?${params}`, {
+    headers: { Accept: "application/json" },
+    timeoutMs: TIMEOUT_MS,
+    next: { revalidate: 60 },
+  });
 }
 
 export async function fetchExtraBinanceCoins(
@@ -168,36 +170,31 @@ export async function fetchExtraBinanceCoins(
     price_change_percentage: "24h,7d,30d",
   });
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  return fetchJson<CoinMarket[]>(`${COINGECKO_BASE}/coins/markets?${params}`, {
+    headers: { Accept: "application/json" },
+    timeoutMs: TIMEOUT_MS,
+    next: { revalidate: 60 },
+  });
+}
 
-  try {
-    const res = await fetch(`${COINGECKO_BASE}/coins/markets?${params}`, {
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-      next: { revalidate: 60 },
-    });
-
-    if (!res.ok) {
-      throw new Error(`CoinGecko extra coins error: ${res.status}`);
-    }
-
-    return res.json();
-  } finally {
-    clearTimeout(timeout);
-  }
+function pseudoRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
 }
 
 function generateLiquidation(volatility: number, volume: number): LiquidationData {
   const absVol = Math.abs(volatility);
-  const base = absVol * 0.8 + Math.random() * absVol * 0.4;
-  const totalPct = Math.min(base, 15);
+  const volScale = Math.min(Math.abs(volume) / 1e9, 5);
+  const base = Math.min(absVol * 0.8 + volScale * 0.4, 15);
 
-  const longRatio = volatility < 0 ? 0.6 + Math.random() * 0.3 : 0.3 + Math.random() * 0.4;
+  const seed = Math.round(volatility * 100) * 1e6 + (Math.abs(Math.round(volume / 1e6)) % 1e6);
+  const rnd = pseudoRandom(seed);
+
+  const longRatio = volatility < 0 ? 0.6 + rnd * 0.3 : 0.3 + rnd * 0.4;
   const shortRatio = 1 - longRatio;
 
-  const longPct = totalPct * longRatio;
-  const shortPct = totalPct * shortRatio;
+  const longPct = base * longRatio;
+  const shortPct = base * shortRatio;
 
   let netDirection: "long" | "short" | "neutral";
   if (longPct > shortPct * 1.2) {
@@ -208,7 +205,7 @@ function generateLiquidation(volatility: number, volume: number): LiquidationDat
     netDirection = "neutral";
   }
 
-  return { totalPct, longPct, shortPct, netDirection };
+  return { totalPct: base, longPct, shortPct, netDirection };
 }
 
 export function computeDerived(coin: CoinMarket) {

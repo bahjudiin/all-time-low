@@ -1,7 +1,28 @@
 import type { BinanceKline, BinanceFundingRate, BinanceOpenInterest, BinanceLongShortRatio } from "@/types/signal";
+import { fetchJson } from "@/lib/retry";
 
 const BASE_URL = "https://api.bybit.com";
 const TIMEOUT_MS = 12_000;
+
+const INTERVAL_MS: Record<string, number> = {
+  "1": 60000,
+  "3": 180000,
+  "5": 300000,
+  "15": 900000,
+  "30": 1800000,
+  "60": 3600000,
+  "120": 7200000,
+  "240": 14400000,
+  "360": 21600000,
+  "720": 43200000,
+  "D": 86400000,
+  "M": 2592000000,
+  "W": 604800000,
+};
+
+function intervalToMs(interval: string): number {
+  return INTERVAL_MS[interval] ?? 3600000;
+}
 
 export const COINGECKO_TO_BYBIT: Record<string, string> = {
   bitcoin: "BTCUSDT",
@@ -70,16 +91,10 @@ export const COINGECKO_TO_BYBIT: Record<string, string> = {
 };
 
 async function fetchWithTimeout<T>(url: string): Promise<T | null> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) return null;
-    return (await response.json()) as T;
+    return await fetchJson<T>(url, { timeoutMs: TIMEOUT_MS });
   } catch {
     return null;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 
@@ -89,14 +104,15 @@ export async function fetchBybitKlines(symbol: string, interval: string = "60", 
     result: { list: Array<[string, string, string, string, string, string, string]> };
   }>(url);
   if (!raw?.result?.list) return [];
+  const intervalMs = intervalToMs(interval);
   return raw.result.list.map((k) => ({
-    openTime: parseInt(k[0]),
+    openTime: parseInt(k[0], 10),
     open: parseFloat(k[1]),
     high: parseFloat(k[2]),
     low: parseFloat(k[3]),
     close: parseFloat(k[4]),
     volume: parseFloat(k[5]),
-    closeTime: parseInt(k[0]) + 3600000,
+    closeTime: parseInt(k[0], 10) + intervalMs,
     quoteVolume: parseFloat(k[6]),
     trades: 0,
   })).reverse();
@@ -111,7 +127,7 @@ export async function fetchBybitFundingRate(symbol: string): Promise<BinanceFund
   return raw.result.list.map((r) => ({
     symbol: r.symbol,
     fundingRate: parseFloat(r.fundingRate),
-    fundingTime: parseInt(r.fundingRateTimestamp),
+    fundingTime: parseInt(r.fundingRateTimestamp, 10),
   }));
 }
 
@@ -125,7 +141,7 @@ export async function fetchBybitOpenInterest(symbol: string): Promise<BinanceOpe
   return {
     current: item.openInterest,
     symbol: item.symbol,
-    time: parseInt(item.timestamp),
+    time: parseInt(item.timestamp, 10),
   };
 }
 
@@ -135,13 +151,23 @@ export async function fetchBybitLongShortRatio(symbol: string): Promise<BinanceL
     result: { list: Array<{ buyRatio: string; sellRatio: string; timestamp: string }> };
   }>(url);
   if (!raw?.result?.list) return [];
-  return raw.result.list.map((r) => ({
-    symbol,
-    longShortRatio: (parseFloat(r.buyRatio) / parseFloat(r.sellRatio)).toFixed(4),
-    longAccount: r.buyRatio,
-    shortAccount: r.sellRatio,
-    timestamp: parseInt(r.timestamp),
-  }));
+  return raw.result.list
+    .map((r) => ({
+      buy: parseFloat(r.buyRatio),
+      sell: parseFloat(r.sellRatio),
+      timestamp: parseInt(r.timestamp, 10),
+    }))
+    .filter((r) => Number.isFinite(r.buy) && Number.isFinite(r.sell))
+    .map((r) => {
+      const ratio = r.sell > 0 ? r.buy / r.sell : 0;
+      return {
+        symbol,
+        longShortRatio: ratio.toFixed(4),
+        longAccount: String(r.buy),
+        shortAccount: String(r.sell),
+        timestamp: r.timestamp,
+      };
+    });
 }
 
 export async function fetchBybitData(symbol: string) {
