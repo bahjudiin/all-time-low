@@ -1,10 +1,27 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-sans",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
+});
+
 export const metadata: Metadata = {
-  title: "ATH/ATL Tracker",
-  description: "Real-time crypto ATH/ATL tracker with predictive signals",
+  title: {
+    default: "ATH/ATL Tracker — Real-Time Crypto Intelligence",
+    template: "%s — ATH/ATL Tracker",
+  },
+  description:
+    "Track all-time highs, all-time lows, liquidation cascades, and predictive signals across 250+ crypto assets. Live from Binance, OKX & Bybit.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -30,7 +47,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className="h-full antialiased">
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
+    >
       <head>
         <link rel="apple-touch-icon" href="/icon.svg" />
         <Script

@@ -1,23 +1,17 @@
 import type { Metadata } from "next";
-import { fetchCoinsMarkets } from "@/lib/coingecko";
-import { AppShell } from "@/components/layout/AppShell";
+import { LandingPage } from "@/components/landing/LandingPage";
 
 export const metadata: Metadata = {
-  title: "ATH/ATL Tracker",
-  description: "Real-time crypto ATH/ATL tracker with predictive signals",
+  title: "ATH/ATL Tracker — Real-Time Crypto Intelligence",
+  description:
+    "Track all-time highs, all-time lows, liquidation cascades, and predictive signals across 250+ crypto assets. Live from Binance, OKX & Bybit.",
+  openGraph: {
+    title: "ATH/ATL Tracker",
+    description: "Real-time crypto ATH/ATL tracker with predictive signals",
+    type: "website",
+  },
 };
 
-export const revalidate = 60;
-
-export default async function Home() {
-  let coins: Awaited<ReturnType<typeof fetchCoinsMarkets>> = [];
-  let fetchError = false;
-  try {
-    coins = await fetchCoinsMarkets("usd", 250, 1);
-  } catch (e) {
-    console.error("Failed to fetch coins:", e);
-    fetchError = true;
-  }
-
-  return <AppShell initialCoins={coins} fetchError={fetchError} />;
+export default function Home() {
+  return <LandingPage />;
 }

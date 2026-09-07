@@ -1,0 +1,23 @@
+import type { Metadata } from "next";
+import { fetchCoinsMarkets } from "@/lib/coingecko";
+import { AppShell } from "@/components/layout/AppShell";
+
+export const metadata: Metadata = {
+  title: "Dashboard — ATH/ATL Tracker",
+  description: "Real-time crypto ATH/ATL tracker with predictive signals",
+};
+
+export const revalidate = 60;
+
+export default async function DashboardPage() {
+  let coins: Awaited<ReturnType<typeof fetchCoinsMarkets>> = [];
+  let fetchError = false;
+  try {
+    coins = await fetchCoinsMarkets("usd", 250, 1);
+  } catch (e) {
+    console.error("Failed to fetch coins:", e);
+    fetchError = true;
+  }
+
+  return <AppShell initialCoins={coins} fetchError={fetchError} />;
+}
