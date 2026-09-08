@@ -161,6 +161,15 @@ export interface CoinSignals {
   agreementPct: number;
   athAtl?: ATHATLResult;
   priceTargets?: PriceTargets;
+  prediction?: PredictionEntryExit;
+}
+
+export interface PredictionEntryExit {
+  entry: number;
+  exit: number;
+  stop: number;
+  rrRatio: number;
+  method: string;
 }
 
 export interface BinanceKline {

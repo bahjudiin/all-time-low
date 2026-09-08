@@ -5,7 +5,17 @@ import { OvervaluedUndervaluedClient } from "@/components/overvalued/OvervaluedU
 import { SignalsListView } from "@/components/signals/SignalsListView";
 import type { OverUnderSubTab } from "@/types/nav";
 import type { OvervaluedUndervaluedResult } from "@/lib/overvaluedUndervalued";
-import { SubTabBar } from "@/components/layout/SubTabBar";
+function SubTabBarImpl<T extends string>({ tabs, active, onChange }: { tabs: { id: T; label: string }[]; active: T; onChange: (id: T) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 4, padding: "0 16px", marginBottom: 8 }}>
+      {tabs.map((t) => (
+        <button key={t.id} onClick={() => onChange(t.id)} className="mono" style={{ padding: "4px 12px", fontSize: 11, fontWeight: 600, border: "none", borderRadius: 2, background: active === t.id ? "var(--amber)" : "none", color: active === t.id ? "var(--ink)" : "var(--muted2)", cursor: "pointer" }}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function OverUnderTab() {
   const subTab = useNavStore((s) => s.overUnderSubTab);
@@ -34,7 +44,7 @@ export function OverUnderTab() {
         </div>
       </div>
 
-      <SubTabBar<OverUnderSubTab>
+      <SubTabBarImpl<OverUnderSubTab>
         tabs={[
           { id: "overvalued", label: "Overvalued" },
           { id: "undervalued", label: "Undervalued" },

@@ -1,19 +1,15 @@
 "use client";
 
-import { X, Trophy, TrendingDown, Activity, Target, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import useSWR from "swr";
+import { X, Trophy, TrendingDown, Activity, Target, AlertTriangle, CheckCircle2, Calendar } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useNavStore } from "@/lib/navStore";
 import type { CoinWithDerived } from "@/types/coin";
 import type { CoinDetailExtra } from "@/types/nav";
 import { formatUSD, formatCompact } from "@/lib/format";
-import type { LiquidationEvent } from "@/types/liquidation";
 
 export type { CoinDetailExtra };
 
-type Section = "overview" | "valuation" | "liq";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+type Section = "overview" | "valuation";
 
 export function CoinModal({ coin, extra }: { coin: CoinWithDerived | null; extra?: CoinDetailExtra }) {
   const modalSymbol = useNavStore((s) => s.modalSymbol);
@@ -60,9 +56,9 @@ export function CoinModal({ coin, extra }: { coin: CoinWithDerived | null; extra
   if (!modalSymbol || !coin) return null;
 
   return (
-    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6" role="dialog" aria-modal="true" aria-labelledby={headingId} aria-describedby={descId}>
+    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby={headingId} aria-describedby={descId}>
       <button aria-label="Close" tabIndex={-1} onClick={closeModal} className="absolute inset-0 modal-backdrop cursor-default" />
-      <div className="relative w-full sm:max-w-lg max-h-[92vh] flex flex-col animate-fade-in" style={{ background: "var(--panel)", border: "1px solid var(--hair)", borderRadius: 2, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+      <div className="relative w-full sm:max-w-[740px] max-h-[92vh] flex flex-col animate-fade-in" style={{ background: "var(--panel)", border: "1px solid var(--hair)", borderRadius: "var(--radius-xs,6px)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--hair)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <img src={coin.image} alt={coin.name} style={{ width: 32, height: 32, borderRadius: "50%" }} loading="lazy" />
@@ -71,21 +67,22 @@ export function CoinModal({ coin, extra }: { coin: CoinWithDerived | null; extra
               <div className="mono" style={{ color: "var(--muted2)", fontSize: 10, textTransform: "uppercase" }}>{coin.symbol}</div>
             </div>
           </div>
-          <button onClick={closeModal} aria-label="Close" style={{ padding: 6, background: "none", border: "none", color: "var(--muted)", cursor: "pointer", borderRadius: 2 }}>
-            <X style={{ width: 18, height: 18 }} />
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="mono" style={{ fontSize: 20, fontWeight: 700 }}>${coin.current_price.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+            <button onClick={closeModal} aria-label="Close" style={{ padding: 6, background: "none", border: "none", color: "var(--muted)", cursor: "pointer", borderRadius: 2 }}>
+              <X style={{ width: 18, height: 18 }} />
+            </button>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 4, padding: "8px 16px", borderBottom: "1px solid var(--hair)" }}>
           <SectionTab active={section === "overview"} onClick={() => setSection("overview")}>Overview</SectionTab>
           {!!extra?.overvalued && <SectionTab active={section === "valuation"} onClick={() => setSection("valuation")}>Valuation</SectionTab>}
-          <SectionTab active={section === "liq"} onClick={() => setSection("liq")}>Liquidation</SectionTab>
         </div>
 
         <div id={descId} className="flex-1" style={{ overflow: "auto", padding: 16 }}>
           {section === "overview" && <OverviewSection coin={coin} extra={extra} />}
           {section === "valuation" && extra?.overvalued && <ValuationSection result={extra.overvalued} coin={coin} />}
-          {section === "liq" && <LiqSection coin={coin} signal={extra?.liq} />}
         </div>
       </div>
     </div>
@@ -104,24 +101,78 @@ function SectionTab({ active, onClick, children }: { active: boolean; onClick: (
 
 function OverviewSection({ coin, extra }: { coin: CoinWithDerived; extra?: CoinDetailExtra }) {
   const isUp = coin.price_change_percentage_24h >= 0;
+  const volMcRatio = coin.total_volume > 0 && coin.market_cap > 0 ? (coin.total_volume / coin.market_cap) * 100 : 0;
+  const supplyPct = coin.circulating_supply > 0 && coin.max_supply ? (coin.circulating_supply / coin.max_supply) * 100 : 0;
+  const rangeLow = coin.low_24h;
+  const rangeHigh = coin.high_24h;
+  const rangePct = rangeHigh > rangeLow ? ((coin.current_price - rangeLow) / (rangeHigh - rangeLow)) * 100 : 50;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span style={{ fontSize: 22, fontWeight: 700 }} className="mono">${coin.current_price.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
-        <span className="mono" style={{ fontSize: 13, fontWeight: 600, color: isUp ? "var(--long)" : "var(--short)" }}>{isUp ? "+" : ""}{coin.price_change_percentage_24h.toFixed(2)}%</span>
-        <span style={{ fontSize: 10, color: "var(--muted2)" }} className="mono">24h {formatUSD(coin.low_24h)} – {formatUSD(coin.high_24h)}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span className="mono" style={{ fontSize: 13, fontWeight: 600, color: isUp ? "var(--long)" : "var(--short)" }}>
+          {isUp ? "+" : ""}{coin.price_change_percentage_24h.toFixed(2)}%
+        </span>
+        <span className="mono" style={{ fontSize: 11, color: "var(--muted2)" }}>
+          {formatUSD(coin.price_change_24h)} today
+        </span>
+        <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--muted2)" }} className="mono">
+          Rank #{coin.market_cap_rank ?? "—"}
+        </span>
       </div>
+
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted2)", marginBottom: 3 }} className="mono">
+          <span>{formatUSD(rangeLow)}</span><span>24H Range</span><span>{formatUSD(rangeHigh)}</span>
+        </div>
+        <div style={{ height: 4, borderRadius: 2, background: "var(--hair)", position: "relative", overflow: "hidden" }}>
+          <div style={{ height: "100%", borderRadius: 2, background: isUp ? "var(--long)" : "var(--short)", width: `${rangePct}%` }} />
+          <div style={{ position: "absolute", left: `${rangePct}%`, top: -2, width: 2, height: 8, background: "var(--text)", borderRadius: 1, transform: "translateX(-1px)" }} />
+        </div>
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <StatTile icon={<Trophy style={{ width: 14, height: 14, color: "var(--amber)" }} />} label="ATH" value={`$${coin.ath.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} sub={`${coin.ath_change_percentage.toFixed(2)}%`} />
-        <StatTile icon={<TrendingDown style={{ width: 14, height: 14, color: "var(--long)" }} />} label="ATL" value={`$${coin.atl.toLocaleString(undefined, { maximumFractionDigits: 6 })}`} sub={`+${coin.atl_change_percentage.toFixed(2)}%`} />
+        <StatTile icon={<Trophy style={{ width: 12, height: 12, color: "var(--amber)" }} />} label="ATH" value={`$${coin.ath.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} sub={`${coin.ath_change_percentage.toFixed(2)}% from now`} />
+        <StatTile icon={<TrendingDown style={{ width: 12, height: 12, color: "var(--long)" }} />} label="ATL" value={`$${coin.atl.toLocaleString(undefined, { maximumFractionDigits: 6 })}`} sub={`+${coin.atl_change_percentage.toFixed(2)}% from now`} />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
         <StatMini label="MCap" value={formatCompact(coin.market_cap)} />
         <StatMini label="Vol 24h" value={formatCompact(coin.total_volume)} />
-        <StatMini label="Rank" value={`#${coin.market_cap_rank ?? "—"}`} />
+        <StatMini label="MCap Δ24h" value={`${coin.market_cap_change_percentage_24h >= 0 ? "+" : ""}${coin.market_cap_change_percentage_24h.toFixed(1)}%`} />
+        <StatMini label="Vol/MCap" value={volMcRatio.toFixed(1) + "%"} />
       </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+        <StatMini label="Circ Supply" value={formatCompact(coin.circulating_supply)} />
+        <StatMini label="Max Supply" value={coin.max_supply ? formatCompact(coin.max_supply) : "∞"} />
+        <StatMini label="Total Supply" value={coin.total_supply ? formatCompact(coin.total_supply) : "—"} />
+        <StatMini label="FDV" value={coin.fully_diluted_valuation ? formatCompact(coin.fully_diluted_valuation) : "—"} />
+      </div>
+
+      {coin.max_supply && coin.circulating_supply > 0 && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted2)", marginBottom: 3 }} className="mono">
+            <span>Circulating</span><span>{supplyPct.toFixed(1)}% of max</span>
+          </div>
+          <div style={{ height: 4, borderRadius: 2, background: "var(--hair)" }}>
+            <div style={{ height: "100%", borderRadius: 2, background: "var(--amber)", width: `${Math.min(supplyPct, 100)}%` }} />
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div style={{ background: "var(--panel-raised)", border: "1px solid var(--hair)", borderRadius: "var(--radius-xs,6px)", padding: "8px 10px" }}>
+          <div style={{ fontSize: 9, color: "var(--muted2)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}><Calendar style={{ width: 10, height: 10, display: "inline", marginRight: 3, verticalAlign: -1 }} />ATH Date</div>
+          <div className="mono" style={{ fontSize: 11, fontWeight: 500 }}>{coin.ath_date ? new Date(coin.ath_date).toLocaleDateString() : "—"}</div>
+        </div>
+        <div style={{ background: "var(--panel-raised)", border: "1px solid var(--hair)", borderRadius: "var(--radius-xs,6px)", padding: "8px 10px" }}>
+          <div style={{ fontSize: 9, color: "var(--muted2)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}><Calendar style={{ width: 10, height: 10, display: "inline", marginRight: 3, verticalAlign: -1 }} />ATL Date</div>
+          <div className="mono" style={{ fontSize: 11, fontWeight: 500 }}>{coin.atl_date ? new Date(coin.atl_date).toLocaleDateString() : "—"}</div>
+        </div>
+      </div>
+
       {extra?.overvalued && <OvervaluedSummary result={extra.overvalued} />}
-      {extra?.liq && <LiqSignalSummary signal={extra.liq} />}
     </div>
   );
 }
@@ -199,43 +250,6 @@ function ValuationSection({ result, coin }: { result: NonNullable<CoinDetailExtr
   );
 }
 
-function LiqSection({ coin, signal }: { coin: CoinWithDerived; signal?: CoinDetailExtra["liq"] }) {
-  const { data } = useSWR<{ events: LiquidationEvent[]; meta: { total: number } }>(`/api/liquidations/history?symbol=${encodeURIComponent(coin.symbol.toUpperCase())}`, fetcher, { refreshInterval: 30_000, revalidateOnFocus: false });
-  const events = useMemo(() => data?.events ?? [], [data]);
-  const agg = useMemo(() => {
-    const longUsd = events.filter((e) => e.side === "long").reduce((s, e) => s + e.usdValue, 0);
-    const shortUsd = events.filter((e) => e.side === "short").reduce((s, e) => s + e.usdValue, 0);
-    const total = longUsd + shortUsd;
-    return { longUsd, shortUsd, total, longPct: total > 0 ? (longUsd / total) * 100 : 50 };
-  }, [events]);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {signal && <LiqSignalSummary signal={signal} />}
-      <div className="panel-box">
-        <div className="ph" style={{ fontSize: 10 }}>OKX Liquidation Events · {events.length} in window</div>
-        {events.length === 0 ? (
-          <p style={{ textAlign: "center", padding: "16px 0", color: "var(--muted2)", fontSize: 11 }}>No recent OKX liquidation events for {coin.symbol.toUpperCase()}.</p>
-        ) : (
-          <div style={{ padding: "8px 12px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 11 }}>
-              <span style={{ color: "var(--muted2)" }}>Longs</span>
-              <span className="mono" style={{ color: "var(--long)" }}>{formatCompact(agg.longUsd)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 11 }}>
-              <span style={{ color: "var(--muted2)" }}>Shorts</span>
-              <span className="mono" style={{ color: "var(--short)" }}>{formatCompact(agg.shortUsd)}</span>
-            </div>
-            <div style={{ display: "flex", gap: 2 }}>
-              <div style={{ height: 4, borderRadius: 2, background: "var(--long)", width: `${agg.longPct}%` }} />
-              <div style={{ height: 4, borderRadius: 2, background: "var(--short)", width: `${100 - agg.longPct}%` }} />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function OvervaluedSummary({ result }: { result: NonNullable<CoinDetailExtra["overvalued"]> }) {
   const isOver = result.direction === "overvalued";
   return (
@@ -256,29 +270,9 @@ function OvervaluedSummary({ result }: { result: NonNullable<CoinDetailExtra["ov
   );
 }
 
-function LiqSignalSummary({ signal }: { signal: NonNullable<CoinDetailExtra["liq"]> }) {
-  const isLong = signal.side === "long";
-  return (
-    <div className="panel-box" style={{ padding: "10px 12px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-        <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: isLong ? "var(--long)" : "var(--short)" }}>LIQUIDATION {signal.side.toUpperCase()}</span>
-        <span style={{ fontSize: 10, color: "var(--muted2)" }}>{signal.timeframe}</span>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
-        <span style={{ color: "var(--muted2)" }}>Agreement</span>
-        <span className="mono" style={{ color: signal.agreementPct >= 80 ? "var(--long)" : "var(--amber)" }}>{signal.agreementPct.toFixed(0)}% ({signal.agreementSamples} TF)</span>
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
-        <span style={{ color: "var(--muted2)" }}>Forecast</span>
-        <span className="mono" style={{ color: signal.predictedPump ? "var(--long)" : "var(--short)" }}>{signal.predictedPump ? "PUMP" : "DUMP"}</span>
-      </div>
-    </div>
-  );
-}
-
 function StatTile({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub: string }) {
   return (
-    <div style={{ background: "var(--panel-raised)", border: "1px solid var(--hair)", borderRadius: 2, padding: "10px 12px" }}>
+    <div style={{ background: "var(--panel-raised)", border: "1px solid var(--hair)", borderRadius: "var(--radius-xs,6px)", padding: "10px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "var(--muted2)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{icon} {label}</div>
       <div className="mono" style={{ fontWeight: 600, fontSize: 13 }}>{value}</div>
       <div style={{ fontSize: 10, color: "var(--muted2)", marginTop: 2 }}>{sub}</div>
@@ -288,7 +282,7 @@ function StatTile({ icon, label, value, sub }: { icon: React.ReactNode; label: s
 
 function StatMini({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ background: "var(--panel-raised)", border: "1px solid var(--hair)", borderRadius: 2, padding: "8px 10px", textAlign: "center" }}>
+    <div style={{ background: "var(--panel-raised)", border: "1px solid var(--hair)", borderRadius: "var(--radius-xs,6px)", padding: "8px 10px", textAlign: "center" }}>
       <div style={{ fontSize: 9, color: "var(--muted2)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>{label}</div>
       <div className="mono" style={{ fontSize: 11, fontWeight: 600 }}>{value}</div>
     </div>

@@ -1,13 +1,28 @@
 "use client";
 
+import useSWR from "swr";
 import { useMemo } from "react";
 import type { CoinMarket } from "@/types/coin";
+import type { CoinSignals } from "@/types/signal";
 import { useNavStore } from "@/lib/navStore";
 import { useCoins } from "@/lib/useCoins";
 import { DataTable } from "@/components/screener/DataTable";
 import { SignalsListView } from "@/components/signals/SignalsListView";
-import { SubTabBar } from "@/components/layout/SubTabBar";
 import type { AthAtlSubTab } from "@/types/nav";
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+function SubTabBarImpl<T extends string>({ tabs, active, onChange }: { tabs: { id: T; label: string }[]; active: T; onChange: (id: T) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 4, padding: "0 16px", marginBottom: 8 }}>
+      {tabs.map((t) => (
+        <button key={t.id} onClick={() => onChange(t.id)} className="mono" style={{ padding: "4px 12px", fontSize: 11, fontWeight: 600, border: "none", borderRadius: 2, background: active === t.id ? "var(--amber)" : "none", color: active === t.id ? "var(--ink)" : "var(--muted2)", cursor: "pointer" }}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function ATHATLTab({ initialCoins }: { initialCoins: CoinMarket[] }) {
   const { coins } = useCoins(initialCoins);
@@ -15,20 +30,23 @@ export function ATHATLTab({ initialCoins }: { initialCoins: CoinMarket[] }) {
   const setSubTab = useNavStore((s) => s.setAthAtlSubTab);
   const openModal = useNavStore((s) => s.openModal);
 
-  const nearATH = useMemo(
-    () =>
-      coins
-        .filter((c) => c.ath_change_percentage >= -15 && c.ath_change_percentage < 0)
-        .sort((a, b) => b.market_cap - a.market_cap),
-    [coins]
+  const { data: signalCoins } = useSWR<(CoinMarket & { signals?: CoinSignals })[]>(
+    "/api/signals?currency=usd",
+    fetcher,
+    { refreshInterval: 300_000, revalidateOnFocus: false, dedupingInterval: 120_000 }
   );
-  const nearATL = useMemo(
-    () =>
-      coins
-        .filter((c) => c.atl_change_percentage <= 15 && c.atl_change_percentage > 0)
-        .sort((a, b) => b.market_cap - a.market_cap),
-    [coins]
-  );
+
+  const signals = useMemo(() => {
+    if (!signalCoins) return {};
+    const map: Record<string, CoinSignals> = {};
+    for (const c of signalCoins) {
+      if (c.signals) map[c.symbol.toLowerCase()] = c.signals;
+    }
+    return map;
+  }, [signalCoins]);
+
+  const nearATH = useMemo(() => coins.filter((c) => c.ath_change_percentage >= -15 && c.ath_change_percentage < 0).sort((a, b) => b.market_cap - a.market_cap), [coins]);
+  const nearATL = useMemo(() => coins.filter((c) => c.atl_change_percentage <= 15 && c.atl_change_percentage > 0).sort((a, b) => b.market_cap - a.market_cap), [coins]);
 
   const avgATH = coins.length > 0 ? coins.reduce((s, c) => s + c.ath_change_percentage, 0) / coins.length : 0;
   const avgATL = coins.length > 0 ? coins.reduce((s, c) => s + c.atl_change_percentage, 0) / coins.length : 0;
@@ -45,7 +63,7 @@ export function ATHATLTab({ initialCoins }: { initialCoins: CoinMarket[] }) {
         </div>
       </div>
 
-      <SubTabBar<AthAtlSubTab>
+      <SubTabBarImpl<AthAtlSubTab>
         tabs={[
           { id: "near-ath", label: "Near ATH" },
           { id: "near-atl", label: "Near ATL" },
@@ -80,9 +98,9 @@ export function ATHATLTab({ initialCoins }: { initialCoins: CoinMarket[] }) {
 
       <main className="flex-1" style={{ minHeight: 0, overflow: "hidden" }}>
         {subTab === "near-ath" ? (
-          <DataTable data={nearATH} onRowClick={(c) => openModal(c.symbol)} />
+          <DataTable data={nearATH} signals={signals} onRowClick={(c) => openModal(c.symbol)} />
         ) : subTab === "near-atl" ? (
-          <DataTable data={nearATL} onRowClick={(c) => openModal(c.symbol)} />
+          <DataTable data={nearATL} signals={signals} onRowClick={(c) => openModal(c.symbol)} />
         ) : (
           <SignalsListView />
         )}

@@ -38,7 +38,7 @@ export function SubTabBar<T extends string>({
             className={`px-3.5 py-1.5 text-xs font-medium rounded-full transition-all whitespace-nowrap ${
               active === tab.id
                 ? "bg-accent text-white shadow-sm"
-                : "text-text-tertiary hover:text-text-secondary hover:bg-surface-hover"
+                : "text-muted hover:text-text-secondary hover:bg-surface-hover"
             }`}
           >
             {tab.label}

@@ -375,6 +375,7 @@ export function computeSignals(
 
   const price = athAtlData.currentPrice;
   const targets = computePriceTargets(price, score, bollinger, atr, ema, athAtlResult);
+  const prediction = computePrediction(price, score, rsi.value, bollinger, atr, ema, cci.value);
 
   return {
     momentum,
@@ -390,6 +391,7 @@ export function computeSignals(
     agreementPct,
     athAtl: athAtlResult,
     priceTargets: targets,
+    prediction,
   };
 }
 
@@ -471,5 +473,92 @@ function makeLevel(price: number, targetPrice: number, source: string): PriceLev
     price: targetPrice,
     distance: round(((targetPrice - price) / price) * 100),
     source,
+  };
+}
+
+function computePrediction(
+  price: number,
+  score: number,
+  rsi: number,
+  bollinger: BollingerResult,
+  atr: ATRResult,
+  ema: EMAResult,
+  cci: number,
+): import("@/types/signal").PredictionEntryExit | undefined {
+  if (score === 0) return undefined;
+
+  const isLong = score > 0;
+  const atrVal = atr.value;
+  const volatilityMult = atr.normalizedPct > 4 ? 1.5 : atr.normalizedPct > 2.5 ? 1.2 : 1.0;
+
+  let entry: number;
+  let exit: number;
+  let stop: number;
+  let method: string;
+
+  if (isLong) {
+    // ENTRY: wait for pullback to ATR-based support zone
+    // Use 0.5x ATR pullback from current price as ideal entry
+    const pullback = atrVal * 0.5 * volatilityMult;
+    const bbSupport = bollinger.lower + (bollinger.middle - bollinger.lower) * 0.3;
+    const emaSupport = Math.min(ema.fast, ema.slow);
+
+    // Entry is the higher of: pullback level or key support (whichever is closer to price but below it)
+    const pullbackEntry = price - pullback;
+    entry = Math.max(pullbackEntry, Math.min(bbSupport, emaSupport));
+    // Don't let entry be more than 1.5 ATR below price
+    entry = Math.max(entry, price - atrVal * 1.5);
+
+    // EXIT: target based on volatility expansion + resistance
+    const targetDist = atrVal * 2 * volatilityMult;
+    const bbTarget = bollinger.upper;
+    const emaTarget = Math.max(ema.fast, ema.slow);
+    exit = Math.min(price + targetDist, Math.max(bbTarget, emaTarget));
+    // At minimum, target 1.5x ATR from entry
+    exit = Math.max(exit, entry + atrVal * 1.5);
+
+    // STOP: below the recent swing low or Bollinger lower band
+    const bbStop = bollinger.lower - atrVal * 0.2;
+    const atrStop = entry - atrVal * 1.0;
+    stop = Math.min(bbStop, atrStop);
+
+    method = `ATR ${volatilityMult.toFixed(1)}x pullback + BB reversion`;
+  } else {
+    // SHORT: wait for bounce to resistance zone
+    const bounce = atrVal * 0.5 * volatilityMult;
+    const bbResistance = bollinger.upper - (bollinger.upper - bollinger.middle) * 0.3;
+    const emaResistance = Math.max(ema.fast, ema.slow);
+
+    const bounceEntry = price + bounce;
+    entry = Math.min(bounceEntry, Math.max(bbResistance, emaResistance));
+    entry = Math.min(entry, price + atrVal * 1.5);
+
+    const targetDist = atrVal * 2 * volatilityMult;
+    const bbTarget = bollinger.lower;
+    const emaTarget = Math.min(ema.fast, ema.slow);
+    exit = Math.max(price - targetDist, Math.min(bbTarget, emaTarget));
+    exit = Math.min(exit, entry - atrVal * 1.5);
+
+    const bbStop = bollinger.upper + atrVal * 0.2;
+    const atrStop = entry + atrVal * 1.0;
+    stop = Math.max(bbStop, atrStop);
+
+    method = `ATR ${volatilityMult.toFixed(1)}x bounce + BB rejection`;
+  }
+
+  // Risk/Reward ratio
+  const risk = Math.abs(entry - stop);
+  const reward = Math.abs(exit - entry);
+  const rrRatio = risk === 0 ? 0 : reward / risk;
+
+  // Only return if R:R is favorable (>= 1.5)
+  if (rrRatio < 1.5) return undefined;
+
+  return {
+    entry: round(entry),
+    exit: round(exit),
+    stop: round(stop),
+    rrRatio: round(rrRatio),
+    method,
   };
 }
